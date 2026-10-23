@@ -2634,7 +2634,14 @@ function genCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const r=new Uint32
 let pidSeq=1;
 const peerList=()=>{const out=[];for(const p of net.peers.values())if(p.open)out.push(p);return out;};
 function updConn(){if(net.mode==='host')net.connected=peerList().length>0;}
-function rawSend(conn,str){try{conn.send(str);}catch(e){}}
+let ckSeq=1;
+function rawSend(conn,str){try{if(str.length<=48000){conn.send(str);return;}const k=ckSeq++,n=Math.ceil(str.length/48000);for(let i=0;i<n;i++)conn.send(JSON.stringify({e:'ck',k,i,n,d:str.slice(i*48000,(i+1)*48000)}));}catch(e){}}
+/* the guest puts split messages back together (at most 2 MB, and only the newest one in flight) */
+let ckBuf=null;
+function guestRx(d){const m=parseMsg(d,600000);if(!m)return;if(m.e!=='ck'){guestData(m);return;}
+  const k=Math.round(num(m.k,0,1e9)),n=Math.round(num(m.n,1,60)),i=Math.round(num(m.i,0,59));if(typeof m.d!=='string'||i>=n)return;
+  if(!ckBuf||ckBuf.k!==k)ckBuf={k,n,got:0,parts:[]};if(ckBuf.parts[i]===undefined){ckBuf.parts[i]=m.d;ckBuf.got++;}
+  if(ckBuf.got===ckBuf.n){const full=ckBuf.parts.join('');ckBuf=null;const mm=parseMsg(full,2000000);if(mm&&mm.e!=='ck')guestData(mm);}}
 function sendTo(pe,o){if(pe&&pe.open)rawSend(pe.conn,typeof o==='string'?o:JSON.stringify(o));}
 function netSend(o){if(net.mode==='guest'){if(net.conn&&net.connected)rawSend(net.conn,JSON.stringify(o));}else if(net.mode==='host'){const j=JSON.stringify(o);for(const pe of peerList())sendTo(pe,j);}}
 function netEv(e){if(net.mode==='host'&&net.connected)net.events.push(e);}
@@ -2704,8 +2711,17 @@ function newPeer(conn){return{pid:'p'+(pidSeq++),conn,open:false,name:'',tank:nu
 /* multiplayer only runs on the official website (localhost is allowed for testing); downloaded copies play solo */
 const MP_OK=['umvtt.github.io','localhost','127.0.0.1'].includes(location.hostname)&&location.protocol!=='file:';
 const MP_NO='Multiplayer only works on the website: umvtt.github.io/ironfield. This copy can play solo.';
+const MY_BUILD=(document.querySelector('meta[name="ironfield-version"]')||{}).content||'';
+async function latestBuild(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});const v=r.ok?await r.json():null;return v&&v.build?String(v.build).replace(/[^0-9]/g,''):'';}catch(e){return '';}}
+/* reload onto the newest version (the ?v= keeps the browser from serving its cached copy) */
+const reloadNewest=b=>{location.replace(location.pathname+'?v='+b);};
+async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await latestBuild();if(b&&b!==MY_BUILD){coopStatus('Updating to the newest version first…');reloadNewest(b);return false;}return true;}
+function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
+  bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
+  const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
+if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
-  if(!MP_OK){coopStatus(MP_NO,true);return;}
+  if(!MP_OK){coopStatus(MP_NO,true);return;}if(!await ensureFresh())return;
   if(net.mode!=='off')return;Object.assign(net,{mode:'host',code:genCode(),connected:false,conn:null,chat:[],peers:new Map(),lobbyKey:''});hangarMode='mp';useProfile();net.remote={tank:null,name:'',st:0,fr:1};if(state==='hangar')renderHangar();coopUI();coopStatus('Opening a room…');
   try{await Transport.host(net.code,conn=>{
       if(net.locked){conn.on('open',()=>{rawSend(conn,JSON.stringify({e:'locked'}));setTimeout(()=>{try{conn.close();}catch(e){}},400);});return;}
@@ -2771,7 +2787,7 @@ function sendSnapshot(){
 }
 /* ---- guest ---- */
 async function joinCoop(code){
-  if(!MP_OK){coopStatus(MP_NO,true);return;}
+  if(!MP_OK){coopStatus(MP_NO,true);return;}if(!await ensureFresh())return;
   code=(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==6){coopStatus('Room codes have 6 characters.',true);return;}
   if(net.mode!=='off')return;store.lastCode=code;persist();Object.assign(net,{mode:'guest',code,connected:false,conn:null,chat:[],squad:[],meIdx:-1,names:{}});net.remote={tank:null,name:'',st:0,fr:1};hangarMode='mp';useProfile();if(state==='hangar')renderHangar();coopUI();coopStatus('Looking for room '+code+'…');
   try{const conn=await Transport.join(code,netError);attach(conn);
@@ -2779,8 +2795,8 @@ async function joinCoop(code){
   catch(err){netError(err);}
 }
 function attach(conn){net.conn=conn;
-  conn.on('open',()=>{net.connected=true;net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
-  conn.on('data',d=>{net.lastRx=performance.now();const m=parseMsg(d,600000);if(m)try{guestData(m);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
+  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
+  conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
   if(net.hostBenched){net.hostBenched=false;state='hangar';}
   const c=net.conn,p=net.peer;if(net.mode==='host'){for(const pe of net.peers.values()){try{pe.conn.close();}catch(e){}}}
@@ -2797,7 +2813,9 @@ function netError(err){
 }
 function onClose(){
   if(net.mode!=='guest'||!net.conn)return;const was=net.connected;net.connected=false;net.conn=null;
-  const n=mateName(),code=net.code,inGame=state!=='hangar';leaveCoop();if(inGame)toHangar(true);$('#joinCode').value=code;coopStatus('Lost the connection to '+n+'\'s room. Press Join to reconnect.',true);if(was)toast('Disconnected from '+n);
+  const quick=was&&performance.now()-(net.openAt||0)<5000;
+  const n=mateName(),code=net.code,inGame=state!=='hangar';leaveCoop();if(inGame)toHangar(true);$('#joinCode').value=code;
+  coopStatus(quick?'The room dropped you right after you connected. That usually means you and the host are on different versions: both of you refresh the page (close the tab or app and open it again), then join.':'Lost the connection to '+n+'\'s room. Press Join to reconnect.',true);if(was)toast('Disconnected from '+n);
 }
 function guestData(d){
   if(!d.e)return;
