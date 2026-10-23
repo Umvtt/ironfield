@@ -294,6 +294,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
     <div class="foot">
       <label class="setting"><input type="checkbox" id="frBoom"> <span>French vehicles explode randomly (20% chance every 10 s) <span class="why" id="frNote"></span></span></label>
       <div class="row">
+        <label class="setting"><span id="langLab">Language</span> <select class="field" id="langSel" style="width:auto;padding:4px 8px;font-size:14px"><option value="en">English</option><option value="tr">Türkçe</option></select></label>
         <button class="btn small" id="installBtn" type="button" hidden>Install on this device</button>
         <button class="btn ghost small admin" id="adminBtn" type="button">Admin: unlock all tanks</button>
         <button class="btn ghost small" id="resetBtn" type="button">Reset progress</button>
@@ -551,7 +552,7 @@ function planeLayout(T){const L=T.L,S=T.S,C=[],cr=Math.max(4,L*.08);
 const AIRPAINT={usa:'#5b6448',ger:'#6a7466',ussr:'#5a6a43',uk:'#5c5f45',fra:'#6b7062'},JETPAINT={usa:'#9ea4a6',ger:'#77806f',ussr:'#a5a9aa',uk:'#8f9389',fra:'#9a9d9e'};
 function initPlane(T){
   T.f=0;T.paint=(T.jet?JETPAINT:AIRPAINT)[T.nation];T.ePaint=mix(T.paint,ENEMY_RED,.42);
-  T.spd=120+T.k*.42;T.vmin=T.spd*(T.jet?.5:.45);T.turnR=T.tn*1.15*Math.PI/180;T.R=Math.max(T.L,T.S)/2+4;T.hitR=Math.max(14,T.S*.32);
+  T.spd=120+T.k*.42;T.vmin=T.spd*(T.jet?.5:.45);T.turnR=T.tn*1.15*(T.cls==='bomber'?1.25:1)*Math.PI/180;T.R=Math.max(T.L,T.S)/2+4;T.hitR=Math.max(14,T.S*.32);
   T.cost=COST[T.tier];T.cr=1+(T.gn||0);T.h=[0,0,0];T.rf=0;T.roof=0;T.t=T.cls==='bomber'?14:4;T.td=false;T.arcR=0;T.base=0;T.px=0;T.gl=0;T.tl=0;T.tw=0;T.shape='none';T.tshare=0;
   T.am=AMMO.AP;T.a='guns';T.n=0;T.rl=0;T.shellV=BULLET_V;T.camo=[];
   T.guns=T.g.map(([n,c,pe,rpm])=>{const rps=n*rpm/60,dr=c<=8?2.6:c<=13?5:c<=20?13:c<=23?16:c<=30?26:c<=37?42:52,fr=clamp(rps/5,2.5,11);return{n,c,pe,fr,d:dr*rps/fr,dps:dr*rps};});
@@ -632,7 +633,7 @@ function fireRocket(t,side){const T=t.T,c=Math.cos(t.a),s=Math.sin(t.a),off=T.S*
 function planeComp(t,x,y){const T=t.T;const w=[];for(const c of t.comps){if(c.kind==='crew'&&!c.alive)continue;let k=c.kind==='crew'?(c.role==='pilot'?.09:.07):c.type==='wing'?.2:c.type==='engine'?.17/Math.max(1,T.eng*.6):c.type==='tail'?.11:.11;w.push([c,k]);}
   let r=Math.random()*(w.reduce((a,b)=>a+b[1],0)+.08);for(const[c,k]of w){r-=k;if(r<=0)return c;}return null;}
 function planeHit(t,dmg,pe,by,kind){if(!t.alive||!t.air)return false;const T=t.T,rep=newReport(),n=kind==='flak'?2:1;if(kind==='flak1')kind='flak';
-  if(t.team==='p'&&!t.pai)dmg*=.65;else if(t.pai)dmg*=.85;t.hitT=time;
+  if(t.team==='p'&&!t.pai)dmg*=.75;else if(t.pai)dmg*=.85;t.hitT=time;
   for(let i=0;i<n;i++){const c=planeComp(t);if(!c)continue;let d=dmg*rand(.7,1.3);if(T.ar&&(c.role==='pilot'||c.type==='engine')&&pe<T.ar*1.2)d*=.25;hurt1(t,c,d,rep);}
   t.lastHitBy=by;if(by&&by.stats&&kind!=='flak')by.stats.hits++;
   const killed=planePost(t,rep,by);const sum=summary(rep);
@@ -663,7 +664,7 @@ function shotVsPlanes(s,ax,ay,bx,by){const own=s.owner,air=s.kind==='bullet',fla
 /* aircraft cannon from above: roof armor, steep angle (about 45 degrees) */
 function strafeTank(t,s){const g=s.g,T=t.T,eff=T.op?0:T.roof*1.4,rep=newReport(),own=s.owner;
   if(own&&own.stats)own.stats.hits++;
-  if(g.pe>=eff){const l=local(t,s.x,s.y),P=t.comps.map(c=>compPos(t,c));blast(t,P,l[0],l[1],5+g.c*.35,g.d*(g.c>=30?2.2:g.c>=20?1.7:1.3)*(own&&own.team==='e'?.55:1),rep,false);
+  if(g.pe>=eff){const l=local(t,s.x,s.y),P=t.comps.map(c=>compPos(t,c));blast(t,P,l[0],l[1],5+g.c*.35,g.d*(g.c>=30?2.2:g.c>=20?1.7:1.3)*(own&&own.team==='e'?.8:1),rep,false);
     if(g.c>=20&&Math.random()<.25&&!T.op)hurt1(t,t.comps.find(c=>c.type==='engine'),g.d*1.5,rep);fx({k:'pen',x:r1(s.x),y:r1(s.y)});if(own&&own.stats)own.stats.pens++;}
   else fx({k:'nop',x:r1(s.x),y:r1(s.y)});
   const killed=post(t,rep,own,'shot');const sum=summary(rep);
@@ -673,7 +674,7 @@ function strafeTank(t,s){const g=s.g,T=t.T,eff=T.op?0:T.roof*1.4,rep=newReport()
   return true;}
 function updAirShells(s,dt){
   if(s.kind==='bomb'){s.t+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vx*=Math.pow(.6,dt);s.vy*=Math.pow(.6,dt);
-    if(s.t>=s.tof){const en=s.owner&&s.owner.team==='e';explosion(s.x,s.y,s.f,s.owner,{rs:en?.8:1.25,mul:en?.8:1,bomb:1});return true;}return false;}
+    if(s.t>=s.tof){const en=s.owner&&s.owner.team==='e';explosion(s.x,s.y,s.f,s.owner,{rs:en?1:1.25,mul:en?.9:1,bomb:1});return true;}return false;}
   if(s.kind==='rocket'){const sx=s.vx*dt,sy=s.vy*dt,ax=s.x,ay=s.y;s.x+=sx;s.y+=sy;s.dist+=Math.hypot(sx,sy);
     if(Math.random()<.8)parts.push({x:ax,y:ay,vx:rand(-8,8),vy:rand(-8,8),life:.8,max:.8,size:2.5,grow:9,color:'200,196,184',a0:.35,drag:.94});
     if(s.dist>90){for(const t of tanks){if(t.air||!t.alive||t===s.owner||(s.owner&&t.team===s.owner.team))continue;if(segCircle(ax,ay,s.x,s.y,t.x,t.y,t.T.W*.6)>=0){explosion(s.x,s.y,s.f,s.owner,{direct:t,mul:s.owner&&s.owner.team==='e'?.85:1});return true;}}}
@@ -717,7 +718,7 @@ function planeAI(t,dt){const T=t.T,A=t.pai,ally=t.team==='p';A.think-=dt;
     else if(A.mode==='dog'){A.mode='attack';A.tgt=null;}
     if(!A.tgt||!A.tgt.alive||(A.mode!=='dog'&&A.tgt.air)){let best=null,bs=1e9;for(const h of F){if(!h.alive||h.air)continue;const d=Math.hypot(h.x-t.x,h.y-t.y);if(d<bs){bs=d;best=h;}}
       if(!best&&T.cls==='fighter')for(const h of F)if(h.alive){best=h;A.mode='dog';break;}A.tgt=best;}
-    A.err=rand(-1,1)*(.08-.03*diff());}
+    A.err=rand(-1,1)*(.06-.025*diff());}
   const p=A.tgt;if(!p){const h=ally?humans().find(q=>q.alive):null,cx=h?h.x+Math.cos(time*.4)*500:WW/2,cy=h?h.y+Math.sin(time*.4)*500:WH/2;t.want=Math.atan2(cy-t.y,cx-t.x);t.altT=1;t.firing=false;t.thrT=.85;return;}
   const dx=p.x-t.x,dy=p.y-t.y,dist=Math.hypot(dx,dy);
   /* threat check: a hostile fighter sitting on our tail, or anti-air close by, makes the pilot jink */
@@ -1461,8 +1462,8 @@ function airThreat(t,h){const d=Math.hypot(h.x-t.x,h.y-t.y);return d*(h.alt<.6?.
 function leadAim(t,h,v){let lt=Math.hypot(h.x-t.x,h.y-t.y)/v;for(let k=0;k<2;k++)lt=Math.hypot(h.x+h.vx*lt-t.x,h.y+h.vy*lt-t.y)/v;return[h.x+h.vx*lt,h.y+h.vy*lt];}
 function aaAI(t,dt){let best=null,bs=1e9;const R=t.T.radar?1300:1100;for(const h of targets()){if(!h.alive||!h.air||Math.hypot(h.x-t.x,h.y-t.y)>R)continue;const sc=airThreat(t,h);if(sc<bs){bs=sc;best=h;}}const bd=best?Math.hypot(best.x-t.x,best.y-t.y):0;
   if(!best){t.aimAir=false;return false;}const A=t.ai,T=t.T;
-  if(A.airTgt!==best){A.airTgt=best;A.airDelay=rand(1.3,2)-.4*diff();}A.airDelay-=dt;
-  const[ax,ay]=leadAim(t,best,T.shellV);A.errT-=dt;if(A.errT<=0){A.err=rand(-1,1)*(T.radar?.026:.04)*(1-.35*diff());A.errT=rand(.35,.8);}
+  if(A.airTgt!==best){A.airTgt=best;A.airDelay=rand(.6,1.1)-.3*diff();}A.airDelay-=dt;
+  const[ax,ay]=leadAim(t,best,T.shellV);A.errT-=dt;if(A.errT<=0){A.err=rand(-1,1)*(T.radar?.017:.026)*(1-.35*diff());A.errT=rand(.35,.8);}
   t.aimAt=Math.atan2(ay-t.y,ax-t.x)+A.err;t.aimAir=true;drive(t,dt,Math.atan2(best.y-t.y,best.x-t.x),bd);
   if(t.canFire&&t.reload<=0&&A.airDelay<=0){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.06){fire(t,bd);}}return true;}
 function drive(t,dt,ang,dist){
@@ -1887,6 +1888,18 @@ function showNews(info){if(!info||typeof info.notes!=='string'||!info.notes)retu
   const setOpen=o=>{list.hidden=!o;btn.textContent=o?'Hide':'Show all';};setOpen(fresh&&items.length>0);el.classList.toggle('fresh',fresh);el.hidden=false;
   btn.onclick=()=>setOpen(list.hidden);try{localStorage.setItem('ironfield-news',String(info.version));}catch(e){}}
 if(location.protocol.startsWith('http'))fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(showNews).catch(()=>{});
+/* language: menus and buttons are translated by swapping exact text nodes (a MutationObserver catches re-rendered parts);
+   the battle HUD on the canvas stays in English */
+const TR={'Solo':'Tek oyuncu','Multiplayer':'Çok oyunculu','Deploy':'Savaşa gir','Deploy squad':'Timi savaşa sok','Research points':'Araştırma puanı','Best wave':'En iyi dalga','Resume':'Devam et','Return to hangar':'Hangara dön','Paused':'Duraklatıldı','Hangar':'Hangar','Start wave':'Dalgayı başlat','Ready':'Hazır','Not ready':'Hazır değil','Change tank':'Tank değiştir','Change vehicle':'Araç değiştir','Create room':'Oda kur','Join':'Katıl','Copy code':'Kodu kopyala','Share':'Paylaş','Leave room':'Odadan çık','Lock room':'Odayı kilitle','Unlock room':'Kilidi aç','Kick':'At','Sure?':'Emin misin?','Send':'Gönder','Join the battle':'Savaşa katıl','Deploy again':'Tekrar savaşa gir','Show all':'Tümünü göster','Hide':'Gizle',"What's new":'Yenilikler','Researched':'Araştırıldı','In use':'Kullanımda','Reset progress':'İlerlemeyi sıfırla','Install on this device':'Bu cihaza yükle','Light tanks':'Hafif tanklar','Medium tanks':'Orta tanklar','Heavy tanks':'Ağır tanklar','Tank destroyers':'Tank avcıları','Artillery':'Topçu','Anti-air':'Uçaksavar','Fighters':'Avcı uçakları','Bombers':'Bombardıman uçakları','Vehicle lost':'Araç kaybedildi','Squad wiped out':'Tim yok edildi','End battle for everyone':'Savaşı herkes için bitir','Close':'Kapat','Language':'Dil','Admin: unlock all tanks':'Admin: tüm tankları aç','Host':'Kur','Room code':'Oda kodu','Open a room':'Oda aç','Enter a room code':'Oda kodunu gir','Players in your room':'Odandaki oyuncular','After-action report':'Savaş sonrası rapor','Continue':'Devam','Ready in this tank':'Bu tankla hazır','Use in co-op':'Ortak oyunda kullan','Research':'Araştır','Locked':'Kilitli','Admin only':'Sadece admin','USA':'ABD','Germany':'Almanya','USSR':'SSCB','Britain':'Britanya','France':'Fransa','Ground forces':'Kara kuvvetleri','Aviation':'Havacılık','Callsign · shown above your vehicle':'Çağrı adı · aracının üstünde görünür','Wave cleared':'Dalga temizlendi','Not connected. Host a room or join a friend\'s.':'Bağlı değil. Oda kur ya da bir arkadaşına katıl.','Hold the field against waves of enemy armor. There are no hit points: a shell has to get through the armor, and then the spall and explosive filler have to knock out enough of the crew or set off the ammunition. Research vehicles across five nations with the points you earn.':'Düşman zırhlı dalgalarına karşı alanı tut. Can puanı yok: mermi zırhı delmeli, sonra parçalar ve patlayıcı yeterince mürettebatı etkisiz bırakmalı ya da cephaneyi patlatmalı. Kazandığın puanlarla beş ulusun araçlarını araştır.'};
+let lang='en';try{lang=localStorage.getItem('ironfield-lang')||((navigator.language||'').startsWith('tr')?'tr':'en');}catch(e){}
+const orig=new WeakMap();let tring=false;
+function trNode(n){const cur=n.nodeValue,key=(orig.has(n)?orig.get(n):cur).trim();if(!key)return;
+  if(lang==='tr'){const t=TR[key];if(t&&cur.trim()!==t){if(!orig.has(n))orig.set(n,key);n.nodeValue=cur.replace(cur.trim(),t);}}
+  else if(orig.has(n)&&cur.trim()!==orig.get(n)){n.nodeValue=cur.replace(cur.trim(),orig.get(n));}}
+function trTree(root){tring=true;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode()))if(!n.parentElement||!/^(SCRIPT|STYLE)$/.test(n.parentElement.tagName))trNode(n);tring=false;}
+function setLang(l){lang=l==='tr'?'tr':'en';try{localStorage.setItem('ironfield-lang',lang);}catch(e){}document.documentElement.lang=lang;$('#langSel').value=lang;trTree(document.body);}
+new MutationObserver(ms=>{if(tring)return;tring=true;for(const m of ms){if(m.type==='characterData'){const t=m.target;if(orig.has(t)&&(TR[orig.get(t)]===t.nodeValue.trim()||orig.get(t)===t.nodeValue.trim()))continue;orig.delete(t);trNode(t);}else for(const a of m.addedNodes){if(a.nodeType===3){trNode(a);}else if(a.nodeType===1){tring=false;trTree(a);tring=true;}}}tring=false;}).observe(document.body,{childList:true,subtree:true,characterData:true});
+$('#langSel').addEventListener('change',e=>setLang(e.target.value));setLang(lang);
 /* browsers that support it offer "Install": the site then opens full screen from a home-screen icon, like an app */
 let installEv=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;$('#installBtn').hidden=false;});
 $('#installBtn').addEventListener('click',async()=>{if(!installEv)return;installEv.prompt();try{await installEv.userChoice;}catch(e){}installEv=null;$('#installBtn').hidden=true;});
