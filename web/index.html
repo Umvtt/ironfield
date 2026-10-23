@@ -598,7 +598,7 @@ function updPlane(t,dt){
   const e=norm(t.want-t.a),da=clamp(e,-turn*dt,turn*dt);t.a=norm(t.a+da);t.bank=clamp((t.bank||0)+(clamp(e*3,-1,1)-(t.bank||0))*Math.min(1,dt*6),-1,1);
   t.alt+=clamp(t.altT-t.alt,-dt*.7,dt*.55);
   const ox=t.x,oy=t.y;t.x+=Math.cos(t.a)*t.v*dt;t.y+=Math.sin(t.a)*t.v*dt;
-  if(t.pai&&t.pai.mode!=='exit'){t.x=clamp(t.x,5,WW-5);t.y=clamp(t.y,5,WH-5);}
+  if(t.pai){t.x=clamp(t.x,60,WW-60);t.y=clamp(t.y,60,WH-60);}
   t.vx=(t.x-ox)/dt;t.vy=(t.y-oy)/dt;
   /* guns: heat builds while firing; overheated guns lock for a few seconds */
   /* player aircraft patch themselves up slowly (to 80 %) once nothing has hit them for 6 s */
@@ -709,9 +709,9 @@ function controlPlane(p,inp,dt){const T=p.T;
 function planeAI(t,dt){const T=t.T,A=t.pai,ally=t.team==='p';A.think-=dt;
   const groundLeft=tanks.some(o=>o.team==='e'&&o.alive&&!o.air)||spawnQueue.length>0;
   if(ally){if(A.mode==='exit'){A.mode='attack';A.passes=0;}}else if(!groundLeft&&A.mode!=='exit')A.mode='exit';
-  if(A.mode==='exit'){if(!A.ex){const c=[[-300,t.y],[WW+300,t.y],[t.x,-300],[t.x,WH+300]].sort((a,b)=>Math.hypot(a[0]-t.x,a[1]-t.y)-Math.hypot(b[0]-t.x,b[1]-t.y))[0];A.ex=c;}
+  if(A.mode==='exit'){if(!A.ex){const F=fields.find(f=>f.team===t.team);A.ex=F?[F.x+F.w/2,F.y+F.h/2]:[t.x<WW/2?120:WW-120,clamp(t.y,120,WH-120)];}
     t.want=Math.atan2(A.ex[1]-t.y,A.ex[0]-t.x);t.altT=1;t.firing=false;t.thrT=1;
-    if(t.x<-120||t.y<-120||t.x>WW+120||t.y>WH+120||humans().every(h=>!h.alive||Math.hypot(h.x-t.x,h.y-t.y)>2600))t.gone=true;return;}
+    if(Math.hypot(A.ex[0]-t.x,A.ex[1]-t.y)<250||humans().every(h=>!h.alive||Math.hypot(h.x-t.x,h.y-t.y)>2600))t.gone=true;return;}
   if(A.think<=0){A.think=rand(.3,.5);
     const F=foesOf(t);let foe=null,fd=T.cls==='fighter'?(ally?1600:950):0;for(const h of F){if(!h.alive||!h.air||h.crash)continue;const d=Math.hypot(h.x-t.x,h.y-t.y);if(d<fd){fd=d;foe=h;}}
     if(foe&&T.cls==='fighter'&&T.g.some(g=>g[1]>=7)){if(A.mode!=='dog'){A.mode='dog';A.tgt=foe;}}
@@ -747,9 +747,9 @@ function planeAI(t,dt){const T=t.T,A=t.pai,ally=t.team==='p';A.think-=dt;
   if(dist<130){A.mode='egress';A.rk=0;A.egT=4;A.ex2=clamp(t.x+Math.cos(t.a)*750+rand(-200,200),200,WW-200);A.ey=clamp(t.y+Math.sin(t.a)*750+rand(-200,200),200,WH-200);}
 }
 function spawnPlane(T,team){team=team||'e';const H=humans().filter(h=>h.alive),h=H[Math.floor(Math.random()*H.length)]||{x:WW/2,y:WH/2},F=fields.find(f=>f.team===team),fieldUp=F&&(team==='p'||obs.some(o=>o.hangar===team))&&Math.hypot(F.x-h.x,F.y-h.y)<5200;
-  const a=Math.random()*TAU,x=fieldUp?F.x+F.w*rand(.2,.8):clamp(h.x+Math.cos(a)*3200,-60,WW+60),y=fieldUp?F.y+F.h/2:clamp(h.y+Math.sin(a)*3200,-60,WH+60);
+  const a=Math.random()*TAU,x=fieldUp?F.x+F.w*rand(.2,.8):clamp(h.x+Math.cos(a)*3200,80,WW-80),y=fieldUp?F.y+F.h/2:clamp(h.y+Math.sin(a)*3200,80,WH-80);
   const t=makeTank(T,x,y,team==='p'?'e':'e');if(team==='p'){t.team='p';t.ally=true;}t.a=Math.atan2(h.y-y,h.x-x);t.want=t.a;t.pai={mode:'attack',think:0,tgt:null,passes:0,max:T.cls==='bomber'?2:3,err:0};t.ai=null;tanks.push(t);
-  t.x=clamp(t.x,-50,WW+50);t.y=clamp(t.y,-50,WH+50);
+  t.x=clamp(t.x,80,WW-80);t.y=clamp(t.y,80,WH-80);
   if(team==='p')sayAll('AI '+T.name+' scrambled from our airfield to cover you','#8bd66e');else sayAll((T.cls==='bomber'?'Enemy bomber':'Enemy aircraft')+(fieldUp?' taking off from their airfield: ':' inbound: ')+T.name,'#ebd257');return t;}
 function pickPlane(n){const lead=humans().reduce((a,b)=>b.T.tier>a.T.tier?b:a),pt=Math.min(5,lead.T.tier),tier=clamp(pt-1+Math.floor((n-1)/6),1,5);
   const anyAir=humans().some(h=>h.air),wantF=anyAir?Math.random()<.7:Math.random()<.55;
