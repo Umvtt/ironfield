@@ -3,6 +3,7 @@ package com.ironfield.game;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -10,37 +11,54 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.WindowManager;
-import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.MessageDigest;
 
 /**
- * Ironfield is a web game. The app shows it full screen and loads it from the published site,
- * so every update you publish reaches players the next time they open the app. Without a
- * connection it falls back to the last cached copy, then to the copy bundled in the APK.
+ * Ironfield is a web game. The app shows it full screen at the published site's address, but
+ * the page itself comes from a copy stored on the phone (first the one bundled in the APK, then
+ * whatever update the player installed). On open it asks the site for version.json; if the
+ * published game is different it offers "Update", downloads it, checks it and reloads.
+ * Serving the copy under the site's https address keeps saves (localStorage) and co-op working.
  * It also checks GitHub Releases for a newer APK and offers it.
  */
 public class MainActivity extends Activity {
+    private static final long CHECK_EVERY_MS = 10 * 60 * 1000;
+
     private WebView web;
-    private boolean usedBundledCopy = false;
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private SharedPreferences prefs;
+    private File gameFile;
+    private long lastGameCheck = -CHECK_EVERY_MS;
+    private boolean updateDialogOpen = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        prefs = getSharedPreferences("game", MODE_PRIVATE);
+        gameFile = new File(getFilesDir(), "game/index.html");
 
         web = new WebView(this);
         web.setBackgroundColor(0xFF10130D);
@@ -61,11 +79,14 @@ public class MainActivity extends Activity {
         s.setUserAgentString(s.getUserAgentString() + " IronfieldApp/" + BuildConfig.VERSION_CODE);
 
         web.setWebViewClient(new WebViewClient() {
+            /** The game page is always the installed copy, so it works offline and only changes when the player taps Update. */
             @Override
-            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame() && !usedBundledCopy) {
-                    usedBundledCopy = true;
-                    view.loadUrl("file:///android_asset/index.html");
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (!"GET".equals(request.getMethod()) || !isGamePage(request.getUrl().toString())) return null;
+                try {
+                    return new WebResourceResponse("text/html", "UTF-8", openInstalledGame());
+                } catch (Exception e) {
+                    return null;
                 }
             }
 
@@ -83,6 +104,130 @@ public class MainActivity extends Activity {
         else web.loadUrl(BuildConfig.GAME_URL);
 
         checkForNewApk();
+    }
+
+    private static boolean isGamePage(String url) {
+        int cut = url.indexOf('?');
+        if (cut < 0) cut = url.indexOf('#');
+        if (cut >= 0) url = url.substring(0, cut);
+        return url.equals(BuildConfig.GAME_URL) || url.equals(BuildConfig.GAME_URL + "index.html");
+    }
+
+    private InputStream openInstalledGame() throws Exception {
+        if (gameFile.exists()) return new FileInputStream(gameFile);
+        return getAssets().open("index.html");
+    }
+
+    /** Version of the game the player has: the last update they installed, or the one bundled in the APK. */
+    private String installedGameVersion() {
+        if (gameFile.exists()) return prefs.getString("version", "");
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(getAssets().open("game-version.txt"), "UTF-8"))) {
+            String v = r.readLine();
+            return v == null ? "" : v.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Asks the site which game version is published; if it differs from the installed one, offer it. */
+    private void checkForGameUpdate() {
+        if (BuildConfig.GAME_URL.contains("YOUR-") || updateDialogOpen) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastGameCheck < CHECK_EVERY_MS) return;
+        lastGameCheck = now;
+        new Thread(() -> {
+            try {
+                JSONObject info = new JSONObject(httpGet(BuildConfig.GAME_URL + "version.json?t=" + System.currentTimeMillis()));
+                String version = info.optString("version", "");
+                String notes = info.optString("notes", "").trim();
+                if (version.isEmpty() || version.equals(installedGameVersion())) return;
+                ui.post(() -> offerGameUpdate(version, notes));
+            } catch (Exception ignored) {
+                // offline or site not published yet: keep playing the installed copy
+            }
+        }).start();
+    }
+
+    private void offerGameUpdate(String version, String notes) {
+        if (isFinishing() || updateDialogOpen) return;
+        updateDialogOpen = true;
+        String msg = "A new version of Ironfield is ready.";
+        if (!notes.isEmpty()) msg += "\n\nWhat's new: " + notes;
+        msg += "\n\nUpdate now? Your progress is kept.";
+        new AlertDialog.Builder(this)
+                .setTitle("Game update available")
+                .setMessage(msg)
+                .setCancelable(false)
+                .setPositiveButton("Update", (d, w) -> installGameUpdate(version))
+                .setNegativeButton("Later", (d, w) -> updateDialogOpen = false)
+                .show();
+    }
+
+    /** Downloads the published game, checks it matches the advertised version, swaps it in and reloads. */
+    private void installGameUpdate(String version) {
+        AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("Updating Ironfield")
+                .setMessage("Downloading the new version…")
+                .setCancelable(false)
+                .show();
+        new Thread(() -> {
+            boolean ok = false;
+            File tmp = new File(gameFile.getParentFile(), "index.html.download");
+            try {
+                gameFile.getParentFile().mkdirs();
+                HttpURLConnection c = open(BuildConfig.GAME_URL + "index.html?v=" + version);
+                if (c.getResponseCode() == 200) {
+                    MessageDigest sha = MessageDigest.getInstance("SHA-256");
+                    try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(tmp)) {
+                        byte[] buf = new byte[16384];
+                        int n;
+                        while ((n = in.read(buf)) > 0) { out.write(buf, 0, n); sha.update(buf, 0, n); }
+                    }
+                    StringBuilder hex = new StringBuilder();
+                    for (byte b : sha.digest()) hex.append(String.format("%02x", b));
+                    // version.json holds the start of the file's SHA-256, so a half-downloaded or stale file is rejected
+                    if (hex.toString().startsWith(version) && tmp.renameTo(gameFile)) {
+                        prefs.edit().putString("version", version).apply();
+                        ok = true;
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                tmp.delete();
+            }
+            final boolean done = ok;
+            ui.post(() -> {
+                progress.dismiss();
+                updateDialogOpen = false;
+                if (done) {
+                    web.loadUrl(BuildConfig.GAME_URL);
+                    Toast.makeText(this, "Ironfield updated", Toast.LENGTH_SHORT).show();
+                } else {
+                    lastGameCheck = -CHECK_EVERY_MS;
+                    Toast.makeText(this, "Update failed. Check your connection and reopen the game.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+
+    private static HttpURLConnection open(String address) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(address).openConnection();
+        c.setRequestProperty("User-Agent", "IronfieldApp");
+        c.setUseCaches(false);
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(20000);
+        return c;
+    }
+
+    private static String httpGet(String address) throws Exception {
+        HttpURLConnection c = open(address);
+        if (c.getResponseCode() != 200) throw new Exception("HTTP " + c.getResponseCode());
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line);
+        }
+        return sb.toString();
     }
 
     /** Back works like Esc in the game (pause/menu). In the hangar it leaves the app. */
@@ -107,7 +252,7 @@ public class MainActivity extends Activity {
     protected void onPause() { super.onPause(); web.onPause(); }
 
     @Override
-    protected void onResume() { super.onResume(); web.onResume(); hideSystemBars(); }
+    protected void onResume() { super.onResume(); web.onResume(); hideSystemBars(); checkForGameUpdate(); }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
@@ -144,7 +289,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Asks GitHub for the newest "apk-N" release; if N is higher than this build, offer the download. */
+    /** Asks GitHub for the newest release, tagged "v<app>.<build>"; if <app> is higher than this build, offer the download. */
     private void checkForNewApk() {
         if (BuildConfig.REPO.startsWith("YOUR-")) return;
         new Thread(() -> {
@@ -163,8 +308,9 @@ public class MainActivity extends Activity {
                 }
                 JSONObject rel = new JSONObject(sb.toString());
                 String tag = rel.optString("tag_name", "");
-                if (!tag.startsWith("apk-")) return;
-                int latest = Integer.parseInt(tag.substring(4));
+                int dot = tag.indexOf('.');
+                if (!tag.startsWith("v") || dot < 2) return;
+                int latest = Integer.parseInt(tag.substring(1, dot));
                 if (latest <= BuildConfig.VERSION_CODE) return;
                 String download = rel.optString("html_url", "");
                 JSONArray assets = rel.optJSONArray("assets");
