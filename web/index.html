@@ -603,6 +603,10 @@ function initPlaneState(t){const T=t.T;Object.assign(t,{alt:1,altT:1,thr:.8,thrT
 const engFrac=t=>{let n=0,a=0;for(const c of t.comps)if(c.kind==='mod'&&c.type==='engine'){n++;if(c.hp>0)a++;}return n?a/n:1;};
 function modHP(t,type,side){let best=1;for(const c of t.comps)if(c.kind==='mod'&&c.type===type&&(side===undefined||Math.sign(c.y)===side))best=Math.min(best,c.hp/c.max);return best;}
 /* ---- flight ---- */
+/* turn-rate multiplier: fighters you fly turn about twice as hard as before (and keep more of it when slow);
+   AI allies get some of that, enemy fighters a little, so you can out-turn them */
+function planeAgility(t){const f=t.T.cls==='fighter';if(t.team!=='p')return f?1.15:1;if(t.pai)return f?1.5:1.2;
+  return f?2.2*(1+.35*(1-clamp(t.v/t.T.spd,0,1))):1.2;}
 function updPlane(t,dt){
   const T=t.T;
   if(t.debris>0){t.debris+=dt;if(Math.random()<dt*6)parts.push({x:t.x+rand(-8,8),y:t.y+rand(-8,8),vx:rand(-6,6)+8,vy:rand(-6,6)-10,life:2.2,max:2.2,size:5,grow:20,color:'30,28,26',a0:.4,drag:.98});return;}
@@ -635,7 +639,7 @@ function updPlane(t,dt){
   if((t.glide>4&&t.v<T.vmin*.9)||t.glide>9){planeDown(t,t.lastHitBy||null,ef<=0?'engine':'pilot');return;}
   /* map edge: the plane banks back toward the battlefield */
   const M=150;if(t.pai&&t.pai.mode!=='exit'&&(t.x<M||t.y<M||t.x>WW-M||t.y>WH-M))t.want=Math.atan2(WH/2-t.y,WW/2-t.x);
-  const wf=Math.min(modHP(t,'wing',-1),modHP(t,'wing',1)),tf=modHP(t,'tail'),turn=T.turnR*(.55+.45*clamp(t.v/T.spd,0,1.1))*(.5+.5*Math.min(wf,tf))*(t.glide>0?.6:1)*(t.team==='p'?1.2:1);
+  const wf=Math.min(modHP(t,'wing',-1),modHP(t,'wing',1)),tf=modHP(t,'tail'),turn=T.turnR*(.55+.45*clamp(t.v/T.spd,0,1.1))*(.5+.5*Math.min(wf,tf))*(t.glide>0?.6:1)*planeAgility(t);
   const e=norm(t.want-t.a),da=clamp(e,-turn*dt,turn*dt);t.a=norm(t.a+da);t.bank=clamp((t.bank||0)+(clamp(e*3,-1,1)-(t.bank||0))*Math.min(1,dt*6),-1,1);
   t.alt+=clamp(t.altT-t.alt,-dt*.7,dt*.55);
   const ox=t.x,oy=t.y;t.x+=Math.cos(t.a)*t.v*dt;t.y+=Math.sin(t.a)*t.v*dt;
@@ -1024,6 +1028,7 @@ function prereqMet(T){if(T.admin)return false;if(T.tier<=1)return true;
 const canResearch=T=>!owned(T.id)&&prereqMet(T);
 
 /* ================= world ================= */
+const CRATER_LIFE=8;
 let fields=[],depots=[],fuelQ=[],obs=[],obsAll=[],rubble=[],trees=[],craters=[],tanks=[],shells=[],parts=[],floaters=[],feed=[],marks=[],nukes=[],strikes=[];
 let player=null,state='hangar',wave=0,phase='combat',phaseT=0,spawnQueue=[],kills=0,battleRP=0,shotsF=0,shotsHit=0,shotsPen=0,deadT=0,deathCause='';
 let votes=new Set(),gVotes={n:0,of:1,me:false,need:1},runCp=1,pickOpen=false,pickNation=null,curSeed=1,obsTotal=0,nidSeq=1,shellSeq=1,myNid=0,hostNid=0,statsHost={shots:0,hits:0,pens:0,kills:0,rp:0},allDeadT=-1,menuOpen=false,tanksById={},gLeft=0;const whistled=new Set();
@@ -2371,7 +2376,11 @@ function draw(dt){
   ctx.setTransform(DPR*ZOOM,0,0,DPR*ZOOM,DPR*ox,DPR*oy);
   drawGround(hw,hh);
   ctx.strokeStyle='rgba(216,207,162,.25)';ctx.lineWidth=4;ctx.strokeRect(0,0,WW,WH);
-  for(const c of craters){if(!vis(c.x,c.y,c.r*1.6))continue;const gr=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*1.5);gr.addColorStop(0,c.nuke?'rgba(15,12,10,.9)':'rgba(22,18,12,.75)');gr.addColorStop(.6,c.nuke?'rgba(40,32,24,.6)':'rgba(55,45,30,.35)');gr.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(c.x,c.y,c.r*1.5,0,TAU);ctx.fill();}
+  /* blast marks fade away quickly (CRATER_LIFE s, nukes longer) */
+  craters=craters.filter(c=>time-(c.t??time)<(c.nuke?CRATER_LIFE*4:CRATER_LIFE));
+  for(const c of craters){if(!vis(c.x,c.y,c.r*1.6))continue;const life=c.nuke?CRATER_LIFE*4:CRATER_LIFE,age=time-(c.t??time);ctx.globalAlpha=clamp((life-age)/(life*.5),0,1);
+    const gr=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*1.5);gr.addColorStop(0,c.nuke?'rgba(15,12,10,.9)':'rgba(22,18,12,.75)');gr.addColorStop(.6,c.nuke?'rgba(40,32,24,.6)':'rgba(55,45,30,.35)');gr.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(c.x,c.y,c.r*1.5,0,TAU);ctx.fill();}
+  ctx.globalAlpha=1;
   for(const f of fields)if(vis(f.x+f.w/2,f.y+f.h/2,f.w))drawField(f);
   for(const d of depots)if(vis(d.x,d.y,120))drawDepot(d);
   for(const o of rubble)if(vis(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)))drawRubble(o);
@@ -2894,7 +2903,7 @@ function guestStart(m){
   genMap(m.seed);tanks=[];tanksById={};shells=[];parts=[];floaters=[];feed=[];marks=[];nukes=[];strikes=[];craters=[];whistled.clear();
   for(const id of m.gone){const o=Number.isInteger(id)?obs.find(q=>q.id===id):null;if(o)removeObs(o);}
   for(const f of m.fall){if(!Array.isArray(f))continue;const tr=Number.isInteger(f[0])?trees[f[0]]:null;if(tr){tr.fallen=true;tr.fa=num(f[1],-7,7);}}
-  for(const c of m.cr){if(Array.isArray(c))craters.push({x:num(c[0],0,WW),y:num(c[1],0,WH),r:num(c[2],1,320),nuke:!!c[3]});}
+  for(const c of m.cr){if(Array.isArray(c))craters.push({x:num(c[0],0,WW),y:num(c[1],0,WH),r:num(c[2],1,320),nuke:!!c[3],t:time});}
   myNid=m.you;hostNid=m.host;player=null;battleRP=0;statsHost=newStats();wave=m.w||1;phase='combat';phaseT=0;gLeft=0;nukeCD=0;aimLock=null;hudExpanded=false;
   hint={text:'',t:0};banner={text:'',sub:'',t:0};mapView=false;zoomMul=1;menuOpen=false;hurt=0;shake=0;flash=0;
   state='play';hangarEl.hidden=true;overEl.hidden=true;pausedEl.hidden=true;document.body.classList.add('playing');
@@ -3003,7 +3012,7 @@ function fxApply(e,remote){
     case 'boom':{const Rx=2.2*Math.cbrt(num(e.f,1,2e6))*(e.rs?num(e.rs,.2,1.5):1),sc=clamp(Rx/30,.6,5);if(Rx>=26){parts.push({x:e.x,y:e.y,vx:0,vy:0,life:.45,max:.45,size:Rx*.4,grow:Rx*3.2,color:'255,236,200',a0:.55,drag:1,ring:true});for(let i=0;i<10;i++){const a=rand(0,TAU),v=rand(120,260)*Math.sqrt(sc);parts.push({x:e.x,y:e.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.7,max:.7,size:2,grow:0,color:'70,58,40',a0:.9,drag:.9});}}
       for(let i=0;i<Math.min(90,12+Rx*.8);i++){const a=rand(0,TAU),v=rand(30,170)*sc;parts.push({x:e.x,y:e.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(.3,.8),max:.8,size:rand(3,7)*Math.sqrt(sc),grow:10,color:i%3?'255,150,50':'255,220,120',a0:1,drag:.88,glow:true});}
       for(let i=0;i<Math.min(40,8+Rx*.3);i++)parts.push({x:e.x+rand(-Rx,Rx)*.4,y:e.y+rand(-Rx,Rx)*.4,vx:rand(-40,40)*sc,vy:rand(-40,40)*sc,life:2.4,max:2.4,size:8*Math.sqrt(sc),grow:24*Math.sqrt(sc),color:'60,52,42',a0:.5,drag:.95});
-      craters.push({x:e.x,y:e.y,r:Math.max(6,Rx*.45)});if(craters.length>160)craters.shift();
+      craters.push({x:e.x,y:e.y,r:Math.max(6,Rx*.45),t:time});if(craters.length>160)craters.shift();
       const d0=vdist(e.x,e.y);sfx.boom(clamp(1-d0/2000,.08,1.1)*clamp(sc,.6,1.5),clamp(sc*.9,.6,3));shake=Math.max(shake,clamp(sc*10*(1-d0/1500),0,24));break;}
     case 'cover':{for(let j=0;j<10;j++){const a=rand(0,TAU),v=rand(20,140);parts.push({x:e.x,y:e.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.8,max:.8,size:4,grow:14,color:'120,108,88',a0:.5,drag:.9});}if(vdist(e.x,e.y)<700)sfx.clang(false);break;}
     case 'wreck':{for(let j=0;j<6;j++)parts.push({x:e.x,y:e.y,vx:rand(-90,90),vy:rand(-90,90),life:.3,max:.3,size:2,grow:0,color:'255,230,170',a0:1,drag:.9,glow:true});break;}
@@ -3013,7 +3022,7 @@ function fxApply(e,remote){
     case 'obs':{if(remote){const o=obs.find(q=>q.id===e.id);if(o)removeObs(o);}
       for(let i=0;i<clamp(8+num(e.w,0,400)*num(e.h,0,400)/600,0,40);i++)parts.push({x:e.x+Math.random()*e.w,y:e.y+Math.random()*e.h,vx:rand(-40,40),vy:rand(-40,40),life:2.4,max:2.4,size:8,grow:26,color:'130,118,98',a0:.45,drag:.95});break;}
     case 'spawn':{for(let i=0;i<10;i++)parts.push({x:e.x+rand(-20,20),y:e.y+rand(-20,20),vx:rand(-20,20),vy:rand(-20,20),life:1.4,max:1.4,size:8,grow:20,color:'120,108,88',a0:.35,drag:.95});break;}
-    case 'nuke':{flash=1;shake=40;sfx.nuke();craters.push({x:e.x,y:e.y,r:300,nuke:true});
+    case 'nuke':{flash=1;shake=40;sfx.nuke();craters.push({x:e.x,y:e.y,r:300,nuke:true,t:time});
       for(let i=0;i<160;i++){const a=rand(0,TAU),v=rand(100,900);parts.push({x:e.x,y:e.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(.8,2),max:2,size:rand(8,22),grow:30,color:i%2?'255,170,60':'255,240,190',a0:1,drag:.94,glow:true});}break;}
     case 'whistle':sfx.whistle(num(e.d,.2,3),1);break;
     case 'clean':trimSmoke();break;
