@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Ironfield Co-op</title>
+<meta name="ironfield-build" content="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Saira+Condensed:wght@400;500;600;700&family=Saira+Stencil+One&display=swap">
@@ -2551,6 +2552,34 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+})();
+</script>
+<script>
+/* Downloaded PC copy: the release workflow stamps the ironfield-build meta with this file's version, the site and the
+   download link. On open it asks the site for version.json and, if a different game is published, shows a banner.
+   The website and the Android app leave the meta empty, so this does nothing there. */
+(function(){
+  const m=document.querySelector('meta[name="ironfield-build"]');
+  const mine=m&&m.content,site=m&&m.dataset.site,dl=m&&m.dataset.download;
+  if(!mine||!site||!dl)return;
+  fetch(site+'version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(info=>{
+    if(!info||!info.version||info.version===mine)return;
+    const bar=document.createElement('div');
+    bar.style.cssText='position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;'
+      +'display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;max-width:min(640px,calc(100vw - 32px));padding:12px 14px;'
+      +'background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+    const txt=document.createElement('div');txt.style.cssText='flex:1 1 240px;min-width:0';
+    const head=document.createElement('b');head.textContent='Game update available';head.style.color='var(--signal)';
+    txt.append(head);
+    if(info.notes){const n=document.createElement('div');n.textContent="What's new: "+String(info.notes).slice(0,200);n.style.color='var(--dim)';txt.append(n);}
+    const note=document.createElement('div');note.textContent='Download the new ironfield.html and replace this file. Your progress is kept.';note.style.color='var(--dim)';txt.append(note);
+    const btn=document.createElement('a');btn.href=dl;btn.textContent='Download';
+    btn.style.cssText='padding:8px 14px;background:var(--signal);color:var(--ink);border-radius:3px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;font-weight:600';
+    const x=document.createElement('button');x.type='button';x.textContent='Later';
+    x.style.cssText='all:unset;cursor:pointer;padding:8px 10px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)';
+    x.onclick=()=>bar.remove();
+    bar.append(txt,btn,x);document.body.append(bar);
+  }).catch(()=>{});
 })();
 </script>
 </body>
