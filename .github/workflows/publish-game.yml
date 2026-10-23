@@ -21,7 +21,14 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/configure-pages@v5
+      - name: Stamp the build number
+        run: |
+          BUILD="$(git rev-list --count HEAD -- web)"
+          sed -i "s|<meta name=\"ironfield-version\" content=\"\">|<meta name=\"ironfield-version\" content=\"$BUILD\">|" web/index.html
+          grep -q "name=\"ironfield-version\" content=\"$BUILD\"" web/index.html || { echo "::error::Could not stamp the build number (ironfield-version meta missing from web/index.html)"; exit 1; }
       - name: Write version.json
         env:
           NOTES: ${{ github.event.head_commit.message }}
