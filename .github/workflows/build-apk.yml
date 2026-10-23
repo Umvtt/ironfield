@@ -1,0 +1,62 @@
+# Builds the Android app and attaches it to a GitHub Release named apk-<number>.
+# Installed apps check for a newer apk-<number> and offer the download.
+# Only needed when the app itself changes (files under android/), or run it by hand from the Actions tab.
+name: Build Android app
+on:
+  push:
+    branches: [main]
+    paths: ['android/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Bundle an offline copy of the game into the app
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp web/index.html android/app/src/main/assets/index.html
+
+      - name: Load the signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/ironfield.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/ironfield.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 secret is missing. This build uses a throwaway key, so it cannot install over an earlier build."
+          fi
+
+      - name: Build the APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          NAME="${GITHUB_REPOSITORY#*/}"
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          if [ "$(echo "$NAME" | tr '[:upper:]' '[:lower:]')" = "$OWNER_LC.github.io" ]; then URL="https://$OWNER_LC.github.io/"; else URL="https://$OWNER_LC.github.io/$NAME/"; fi
+          echo "Game URL: $URL"
+          gradle -p android assembleRelease --no-daemon \
+            -PversionCode=${{ github.run_number }} -PgameUrl="$URL" -PrepoSlug="$GITHUB_REPOSITORY"
+          cp android/app/build/outputs/apk/release/app-release.apk ironfield.apk
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Ironfield app (build ${{ github.run_number }})
+          body: Install ironfield.apk on Android. Game updates arrive automatically; this file is only needed for new app versions.
+          files: ironfield.apk
+          make_latest: true

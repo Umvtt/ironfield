@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The build workflow passes these in; the defaults are only for building on your own computer.
+def gameUrl = project.findProperty('gameUrl') ?: 'https://YOUR-GITHUB-NAME.github.io/ironfield/'
+def repoSlug = project.findProperty('repoSlug') ?: 'YOUR-GITHUB-NAME/ironfield'
+def buildNumber = (project.findProperty('versionCode') ?: '1').toString().toInteger()
+def keystorePath = System.getenv('KEYSTORE_FILE')
+
+android {
+    namespace 'com.ironfield.game'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.ironfield.game'
+        minSdk 24
+        targetSdk 34
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+        buildConfigField 'String', 'GAME_URL', "\"${gameUrl}\""
+        buildConfigField 'String', 'REPO', "\"${repoSlug}\""
+    }
+
+    buildFeatures { buildConfig true }
+
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias 'ironfield'
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystorePath ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
