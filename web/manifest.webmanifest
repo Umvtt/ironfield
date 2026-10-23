@@ -1,0 +1,15 @@
+{
+  "name": "Ironfield",
+  "short_name": "Ironfield",
+  "description": "War Thunder-style top-down tank and aircraft battles, solo or co-op with up to 14 friends.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#10130d",
+  "theme_color": "#181d13",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
