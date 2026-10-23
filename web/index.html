@@ -264,7 +264,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       <div class="slots" id="slots"></div>
     </section>
     <section class="mp" aria-label="Multiplayer" id="mpPanel" hidden>
-      <div class="mp-intro"><span class="tag">Co-op vs waves · up to 14 players · peer-to-peer</span><span class="why" id="coopRules">No nuke, no admin unlocks. A room uses the host's current save slot: everyone shares its RP and researched vehicles, and earns RP into it. Your own saves are untouched.</span></div>
+      <div class="mp-intro"><span class="tag">Co-op vs waves · up to 14 players · peer-to-peer</span><span class="why" id="coopRules">No nuke, no admin unlocks. Guests get the host's vehicles and their own RP (starting at 0) to research with. When a guest leaves, the RP they have left goes to the host's save. Your own saves are untouched.</span></div>
       <div class="conn"><i class="live" id="connDot"></i><span id="coopStatus">Not connected. Host a room or join a friend's.</span></div>
       <div class="mp-cards" id="coopIdle">
         <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">You get a random 6-character code. Send it to your friend; they can join before the battle or in the middle of it.</p><div class="row"><button class="btn small" id="hostBtn" type="button">Create room</button></div></div>
@@ -999,8 +999,9 @@ function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(store));}ca
 persist();
 let hangarMode='solo';
 const coopProfile=()=>hangarMode==='mp'||net.mode!=='off';
-/* which profile is live: your current save slot, or, while you are a guest in a room, the host's save (mirrored from
-   the host and never written to your own storage). Everyone in a room shares the host's RP and vehicles. */
+/* which profile is live: your current save slot, or, while you are a guest in a room, your room profile (kept by the
+   host and never written to your own storage): your own RP, starting at 0, plus the host's vehicles and the ones you research.
+   When a guest leaves, the RP they have left goes into the host's save. */
 function useProfile(){const p=net.mode==='guest'?(net.room||(net.room=freshSave())):(store.slots[store.active]||(store.slots[store.active]=freshSave()));
   if(p!==save){save=p;fixSel();viewId=save.sel;}}
 /* PERK: what redeemed codes unlocked. It lives only in memory, so it lasts until the page is reloaded or closed. */
@@ -1592,14 +1593,14 @@ function drive(t,dt,ang,dist){
 /* ================= waves ================= */
 let rpFlash=0;
 function awardRP(n){battleRP+=n;rpFlash=1.2;}
-/* the RP pool: your save in solo, the host's save in a room (guests only see it, mirrored from the host) */
+/* RP into your own save (solo or host); a guest's room RP is kept by the host on the peer (pe.rp) */
 function poolRP(n){if(net.mode==='guest')return;save.rp+=n;persist();}
 function say(t,text,color){if(t===player)log(text,color);else if(t&&t.peer)peerEv(t.peer,{k:'log',text,color});}
 function sayAll(text,color){log(text,color);netEv({k:'log',text,color});}
 function setHint(o,h){if(o===player)hint=h;else if(o&&o.peer)peerEv(o.peer,{k:'hint',h});}
 function floatFor(o,x,y,text,color){if(o===player)floater(x,y,text,color);else if(o&&o.peer)peerEv(o.peer,{k:'float',x:r1(x),y:r1(y),text,color});}
 function hurtFor(t,v,sk){if(t===player){hurt=Math.max(hurt,v);shake=Math.max(shake,sk);}else if(t&&t.peer)peerEv(t.peer,{k:'hurt',v,s:sk});}
-function rpFor(o,n,shared){if(o.stats)o.stats.rp+=n;if(o===player)awardRP(n);else if(o&&o.peer)peerEv(o.peer,{k:'rp',n});if(!shared)poolRP(n);}
+function rpFor(o,n){if(o.stats)o.stats.rp+=n;if(o===player){awardRP(n);poolRP(n);}else if(o&&o.peer){o.peer.rp=(o.peer.rp||0)+n;peerEv(o.peer,{k:'rp',n});}}
 function setBanner(b){banner=b;netEv({k:'banner',b});}
 function log(text,color){feed.push({text,color,t:time});if(feed.length>7)feed.shift();}
 function floater(x,y,text,color){floaters.push({x,y,text,color,life:1.5});}
@@ -1648,7 +1649,7 @@ function clearWrecks(now){let n=0;for(const t of tanks.slice()){if(t.alive||isHu
 function trimSmoke(){for(const p of parts)if(!p.glow&&p.grow>=8)p.life=Math.min(p.life,.7);}
 function waveCleared(){
   const lead=humans().reduce((a,b)=>b.T.tier>a.T.tier?b:a),pt=Math.min(5,lead.T.tier),rp=Math.round((100+50*wave)*[1,1.25,1.5,1.8,2.2][pt-1]);
-  for(const h of humans())rpFor(h,rp,true);poolRP(rp);
+  for(const h of humans())rpFor(h,rp);
   if(wave>save.best){save.best=wave;persist();}
   for(const h of humans())if(h.alive)resupply(h);else respawn(h);
   phase='break';phaseT=0;votes.clear();
@@ -2059,15 +2060,23 @@ nameIn.addEventListener('input',()=>{const v=cleanName(nameIn.value);if(v){store
 nameIn.addEventListener('change',()=>{const v=cleanName(nameIn.value);if(v)store.name=v;nameIn.value=store.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();});
 nameIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();nameIn.blur();}});
 
-function doResearch(T){if(save.rp<T.cost)return;if(net.mode==='guest'){netSend({e:'research',id:T.id});if(state==='hangar')save.sel=T.id;toast('Asking the host to research the '+T.name);return;}
-  if(!applyResearch(T))return;if(state==='hangar')save.sel=T.id;persist();renderHangar();if(pickOpen)renderPick();toast(T.name+' researched');if(net.mode==='host'&&net.connected){sysAll(store.name+' researched the '+T.name+' ('+fmt(T.cost)+' RP)');sendLobby(true);}}
+/* guests research at once on their own room profile; the host applies the same to its copy (pe.rp/pe.mine) */
+function doResearch(T){if(!applyResearch(T))return;if(state==='hangar')save.sel=T.id;if(net.mode==='guest')netSend({e:'research',id:T.id});else persist();
+  renderHangar();if(pickOpen)renderPick();toast(T.name+' researched');if(net.mode==='host'&&net.connected)sendLobby(true);}
+/* a guest's room profile as the host sees it: the host's vehicles plus their own research, and their own RP */
+function guestProfile(pe){return{rp:pe.rp||0,owned:[...new Set(save.owned.filter(id=>TYPE[id]&&!TYPE[id].admin).concat(STARTERS,[...(pe.mine||[])]))],earned:[]};}
+function guestResearch(pe,T){const P=guestProfile(pe),host=save,pk=PERK.all;save=P;PERK.all=false;let ok=false;try{ok=applyResearch(T);}finally{save=host;PERK.all=pk;}
+  if(ok){pe.rp=P.rp;(pe.mine||(pe.mine=new Set())).add(T.id);}return ok;}
+/* a leaving guest's leftover RP goes into the host's save; their research is remembered by name for a rejoin */
+function bankGuest(pe){if(!pe.name)return;(net.left||(net.left={}))[pe.name.toLowerCase()]=[...(pe.mine||[])];const n=Math.round(pe.rp||0);pe.rp=0;
+  if(n>0){save.rp+=n;persist();sysAll(pe.name+'\'s '+fmt(n)+' RP went to '+store.name+'\'s save');}}
 /* research against the real save (owned() also counts session perks, which must not make research free) */
 function applyResearch(T){if(!T||T.admin||save.owned.includes(T.id)||save.rp<T.cost)return false;const pre=prereq(T);if(pre&&!save.owned.includes(pre.id)&&!prereqMet(T))return false;
   save.rp-=T.cost;save.owned.push(T.id);if(!save.earned.includes(T.id))save.earned.push(T.id);return true;}
 function renderHangar(){
   useProfile();const coop=coopProfile();
   $('#rpVal').textContent=fmt(save.rp);$('#bestVal').textContent=save.best?save.best:'–';
-  $('#rpTag').textContent=net.mode==='guest'?'Room research points (host\'s save)':net.mode==='host'?'Room research points · your slot '+(store.active+1):'Research points · slot '+(store.active+1);
+  $('#rpTag').textContent=net.mode==='guest'?'Your room research points':net.mode==='host'?'Research points · your slot '+(store.active+1):'Research points · slot '+(store.active+1);
   $('#modeSolo').setAttribute('aria-selected',String(!coop));$('#modeMp').setAttribute('aria-selected',String(coop));$('#modeSolo').setAttribute('aria-disabled',String(net.mode!=='off'));
   $('#soloPanel').hidden=coop;$('#mpPanel').hidden=!coop;if(!coop)renderSlots();
   $('#adminBtn').hidden=coop;$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
@@ -2653,7 +2662,7 @@ function hud(){
    Star layout: the host's browser runs the whole battle for up to 14 players. Every guest sends inputs and
    actions (~30 Hz) and draws snapshots plus a stream of effect events. PeerJS only brokers the first handshake;
    game traffic then flows browser to browser over WebRTC. Everything that arrives is parsed and clamped before use. */
-const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=3;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
+const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=4;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
 function loadPeer(){return new Promise((res,rej)=>{if(window.Peer)return res(window.Peer);const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';sc.onload=()=>window.Peer?res(window.Peer):rej(new Error('load failed'));sc.onerror=()=>rej(new Error('load failed'));document.head.appendChild(sc);});}
 let Transport={
@@ -2692,8 +2701,9 @@ function nameOf(t){if(!t)return 'Teammate';if(t===player)return store.name;if(t.
 function squadCount(){return net.mode==='host'?1+peerList().length:net.mode==='guest'?Math.max(1,net.squad.length):1;}
 function coopStatus(text,err){const el=$('#coopStatus');el.textContent=text;el.classList.toggle('err',!!err);const d=$('#connDot');d.className='live'+(err?' err':net.connected?' ok':net.mode!=='off'?' wait':'');}
 function sendLobby(force){if(net.mode!=='host')return;const list=peerList(),sq=[[store.name,save.sel,0,state==='hangar'?0:1]].concat(list.map(pe=>[pe.name||'Guest',pe.tank||'m4a1',1,pe.t?1:0]));
-  const base={e:'lobby',v:PROTO,pf:{rp:save.rp,best:save.best,owned:save.owned.filter(id=>!TYPE[id].admin),cp:save.checkpoint||0},st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq},k=JSON.stringify(base);if(!force&&k===net.lobbyKey)return;net.lobbyKey=k;
-  list.forEach((pe,i)=>sendTo(pe,Object.assign({},base,{me:i+1})));}
+  const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
+    k=JSON.stringify([base,pfs]);if(!force&&k===net.lobbyKey)return;net.lobbyKey=k;
+  list.forEach((pe,i)=>sendTo(pe,Object.assign({},base,{me:i+1,pf:pfs[i]})));}
 function coopUI(light){
   const idle=net.mode==='off';$('#coopIdle').hidden=!idle;$('#coopOn').hidden=idle;if(idle&&!MP_OK)coopStatus(MP_NO,true);
   $('#roomCode').textContent=net.code||'';$('#roomTag').textContent=net.mode==='host'?'Your room code · send it to your friends (up to '+(MAX_PLAYERS-1)+')':'Room code';
@@ -2771,7 +2781,7 @@ async function hostCoop(){
   catch(err){netError(err);}
 }
 function peerClosed(pe){if(!net.peers.has(pe.pid))return;const was=pe.open;net.peers.delete(pe.pid);pe.open=false;try{pe.conn.close();}catch(e){}
-  if(pe.t)dropPeerTank(pe,(pe.name||'A player')+' disconnected');votes.delete(pe.pid);updConn();
+  if(pe.t)dropPeerTank(pe,(pe.name||'A player')+' disconnected');votes.delete(pe.pid);updConn();bankGuest(pe);
   if(was&&pe.name){sysAll(pe.name+' left the room');toast(pe.name+' left the room');}net.lobbyKey='';sendLobby(true);coopUI();}
 function dropPeerTank(pe,msg){const t=pe.t;pe.t=null;if(t){const i=tanks.indexOf(t);if(i>=0)tanks.splice(i,1);t.peer=null;}votes.delete(pe.pid);if(msg&&state!=='hangar')sayAll(msg,'#ebd257');}
 function hostData(pe,d){
@@ -2780,14 +2790,14 @@ function hostData(pe,d){
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)pe.rtt=pe.rtt?pe.rtt*.6+r*.4:r;return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
     const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;pe.tank=T&&(!T.admin||pe.perkAll)?d.tank:'m4a1';const n=cleanName(d.name);pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
-    if(first){sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');sfx.ping();}
+    if(first){pe.rp=0;pe.mine=new Set(net.left&&net.left[pe.name.toLowerCase()]||[]);sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');sfx.ping();}
     net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o,mn:!!d.mn};return;}
   if(d.e==='act'){if(!rateOk(pe.acts,1000,8))return;const t=pe.t;if(t&&t.alive&&state==='play'&&['ext','rep','arty','ord','land','gear'].includes(d.a))doAct(t,d.a,num(d.x,0,WW),num(d.y,0,WH));return;}
   if(d.e==='vote'){if(phase==='break'&&pe.t&&state==='play'){if(votes.has(pe.pid))votes.delete(pe.pid);else votes.add(pe.pid);}return;}
   if(d.e==='bench'){if(!rateOk(pe.acts,1000,8))return;if(state==='play'&&phase==='break'&&pe.t){dropPeerTank(pe,(pe.name||'A player')+' went back to the hangar');sendTo(pe,{e:'benched'});net.lobbyKey='';sendLobby();}else sendTo(pe,{e:'nobench'});return;}
   if(d.e==='perk'){if(!rateOk(pe.acts,1000,8))return;const tk=cleanTk(d.tk);if(!tk)return;codeCall('/verify',tk).then(en=>{if(!en||!en.ok||!net.peers.has(pe.pid))return;if((en.perks||[]).includes('all_vehicles')){pe.perkAll=true;if(pe.wantTank&&tget(pe.wantTank)){pe.tank=pe.wantTank;pe.wantTank=null;}net.lobbyKey='';sendLobby(true);coopUI();}});return;}
-  if(d.e==='research'){if(!rateOk(pe.acts,1000,8))return;const T=tget(d.id);if(T&&applyResearch(T)){persist();sysAll((pe.name||'A guest')+' researched the '+T.name+' ('+fmt(T.cost)+' RP)');if(state==='hangar')renderHangar();sendLobby(true);}return;}
+  if(d.e==='research'){if(!rateOk(pe.acts,1000,8))return;const T=tget(d.id);if(T)guestResearch(pe,T);net.lobbyKey='';sendLobby(true);return;}
   if(d.e==='swap'){const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;if(T&&(!T.admin||pe.perkAll)){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
   if(d.e==='chat'){if(!rateOk(pe.chatIn,5000,6))return;const t=cleanText(d.text);if(!t)return;const who=pe.name||'Guest';addChat(who,t,'them');sfx.ping();
     const j=JSON.stringify({e:'chat',from:who,text:t});for(const o of peerList())if(o!==pe)sendTo(o,j);return;}
@@ -2815,13 +2825,13 @@ function snapRate(){const n=peerList().length;return n<=3?.05:n<=7?.067:.1;}
 function sendSnapshot(){
   const list=peerList();if(!list.length){net.events=[];return;}
   const n=playerCount(),need=Math.ceil(n*.5),hn=targets().map(h=>[h.nid,nameOf(h)]);
-  const shared=JSON.stringify({e:'snap',pr:save.rp,w:wave,ph:phase==='break'?1:0,pt:r1(phaseT),l:enemiesLeft(),nc:r1(nukeCD),host:player?player.nid:0,hn,
+  const shared=JSON.stringify({e:'snap',w:wave,ph:phase==='break'?1:0,pt:r1(phaseT),l:enemiesLeft(),nc:r1(nukeCD),host:player?player.nid:0,hn,
     tk:tanks.map(packTank),
     sh:shells.map(packShell).filter(Boolean),
     nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
   net.events=[];const head=shared.slice(0,-1);
   for(const pe of list){const me=pe.t?packMe(pe.t):null,ev=pe.events;pe.events=[];
-    sendTo(pe,head+',"you":'+(pe.t?pe.t.nid:0)+',"vt":'+JSON.stringify([votes.size,n,votes.has(pe.pid)?1:0,need])+',"me":'+JSON.stringify(me)+',"pev":'+JSON.stringify(ev)+'}');}
+    sendTo(pe,head+',"pr":'+Math.round(pe.rp||0)+',"you":'+(pe.t?pe.t.nid:0)+',"vt":'+JSON.stringify([votes.size,n,votes.has(pe.pid)?1:0,need])+',"me":'+JSON.stringify(me)+',"pev":'+JSON.stringify(ev)+'}');}
 }
 /* ---- guest ---- */
 async function joinCoop(code){
@@ -2837,10 +2847,12 @@ function attach(conn){net.conn=conn;
   conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
   if(net.hostBenched){net.hostBenched=false;state='hangar';}
-  const c=net.conn,p=net.peer;if(net.mode==='host'){for(const pe of net.peers.values()){try{pe.conn.close();}catch(e){}}}
+  const c=net.conn,p=net.peer;if(net.mode==='host'){for(const pe of net.peers.values()){bankGuest(pe);try{pe.conn.close();}catch(e){}}}
   Object.assign(net,{mode:'off',peer:null,conn:null,connected:false,code:'',chat:[],lobbyKey:'',peers:new Map(),squad:[],names:{},locked:false,banned:null,room:null});for(const b of[$('#lockBtn'),$('#lockBtn2')])b.textContent='Lock room';net.remote={tank:null,name:'',st:0,fr:1};net.myTank=null;useProfile();
   try{if(c)c.close();}catch(e){}try{if(p)p.destroy();}catch(e){}if(state==='hangar')renderHangar();coopUI();
 }
+/* a host closing the page still pays its guests' leftover RP into its save */
+addEventListener('pagehide',()=>{if(net.mode==='host')for(const pe of net.peers.values())bankGuest(pe);});
 function netError(err){
   const t=err&&err.type;
   if(net.mode==='host'&&net.connected&&t&&t!=='unavailable-id'&&t!=='network'&&t!=='server-error'&&t!=='socket-error'&&t!=='socket-closed')return;
