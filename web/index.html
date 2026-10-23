@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Ironfield Co-op</title>
 <meta name="ironfield-build" content="">
+<meta name="ironfield-version" content="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Saira+Condensed:wght@400;500;600;700&family=Saira+Stencil+One&display=swap">
@@ -27,6 +28,7 @@ body.playing canvas#game{cursor:none}
   padding-block:calc(18px + env(safe-area-inset-top,0px)) calc(18px + env(safe-area-inset-bottom,0px))}
 .sheet{margin:auto;width:100%;max-width:1180px;display:flex;flex-direction:column;gap:16px;min-width:0}
 .sheet.narrow{max-width:560px}
+.build{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim);opacity:.7;pointer-events:none}
 .mast{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;border-bottom:2px solid var(--line);padding-bottom:12px}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,9vw,92px);line-height:.86;margin:0;color:var(--signal);letter-spacing:.02em}
 h2{font-family:var(--display);font-weight:400;font-size:clamp(38px,8vw,68px);line-height:.9;margin:0;color:var(--signal);text-wrap:balance}
@@ -206,7 +208,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
 <div id="toast" hidden></div>
 <div id="breakPanel" class="float" hidden>
   <div class="bp-text"><span class="tag" id="bpTag">Wave cleared</span><b id="bpTitle">Start the next wave?</b><span id="bpVotes"></span></div>
-  <div class="row"><button class="btn small" id="voteBtn" type="button">Start wave</button><button class="btn ghost small" id="swapBtn" type="button">Change tank</button></div>
+  <div class="row"><button class="btn small" id="voteBtn" type="button">Start wave</button><button class="btn ghost small" id="swapBtn" type="button">Change tank</button><button class="btn ghost small" id="benchBtn" type="button" hidden>Hangar</button></div>
 </div>
 <div id="pickPanel" class="float" hidden role="dialog" aria-label="Change tank">
   <div class="pk-head"><span class="tag" id="pickTag">Change vehicle for the next wave</span><button class="btn ghost small" id="pickClose" type="button">Close</button></div>
@@ -274,6 +276,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       </div>
     </div>
   </div>
+  <span class="build" id="buildTag"></span>
 </div>
 
 <div class="overlay" id="over" hidden>
@@ -1494,6 +1497,7 @@ function nextWave(){if(state!=='play'||phase!=='break'||menuOpen)return;if(net.m
 const bpEl=$('#breakPanel'),pickEl=$('#pickPanel'),txc={};
 function setTxt(id,t){if(txc[id]!==t){txc[id]=t;document.getElementById(id).textContent=t;}}
 function breakTick(){
+  if(menuOpen&&net.mode==='guest'){const q=$('#quitBtn');if(q.hidden!==(phase!=='break'))q.hidden=phase!=='break';}
   const show=state==='play'&&phase==='break'&&!!player&&!menuOpen;if(bpEl.hidden===(show&&!pickOpen))bpEl.hidden=!(show&&!pickOpen);
   if(!show){if(pickOpen)closePick();return;}
   const touch=!touchUI.hidden;bpEl.classList.toggle('low',touch||VW<760);
@@ -1503,7 +1507,10 @@ function breakTick(){
   setTxt('bpVotes',of>1?n+' of '+of+' ready · starts when '+need+' '+(need===1?'player is':'players are')+' ready':'Repair, rearm or change tank first. Nothing starts until you press it.');
   setTxt('voteBtn',(of>1?(me?'Not ready':'Ready'):'Start wave')+(touch?'':' (N)'));
   setTxt('swapBtn',pickOpen?'Close list':'Change vehicle'+(touch?'':' (C)'));
+  const bb=$('#benchBtn');if(bb.hidden!==(net.mode!=='guest'))bb.hidden=net.mode!=='guest';
 }
+/* guests may sit out between waves; the host confirms, so a wave that starts at the same moment can't strand an empty tank */
+function benchMe(){if(net.mode!=='guest'||state!=='play'||phase!=='break'||!net.connected)return;const now=performance.now();if(net.benchAt&&now-net.benchAt<3000)return;net.benchAt=now;netSend({e:'bench'});}
 function openPick(){if(state!=='play'||phase!=='break'||!player||menuOpen)return;pickOpen=true;pickNation=player.T.nation;pickDom=domOf(player.T);renderPick();pickEl.hidden=false;}
 function closePick(){pickOpen=false;if(pickEl)pickEl.hidden=true;}
 let pickDom='ground';
@@ -1528,6 +1535,7 @@ function doSwap(h,id){const T=tget(id);if(!h||!T||phase!=='break'||state!=='play
   say(n,'Switched to the '+T.name,'#8bd66e');for(const o of humans())if(o!==n)say(o,nameOf(n)+' switched to the '+T.name,'#8e8a6b');fx({k:'spawn',x:r1(x),y:r1(y)});}
 $('#voteBtn').addEventListener('click',()=>{nextWave();dropFocus();});
 $('#swapBtn').addEventListener('click',()=>{if(pickOpen)closePick();else openPick();dropFocus();});
+$('#benchBtn').addEventListener('click',()=>{benchMe();dropFocus();});
 $('#pickClose').addEventListener('click',()=>{closePick();dropFocus();});
 function goFull(){if(/IronfieldApp\//.test(navigator.userAgent))return;const d=document.documentElement;try{if(!document.fullscreenElement&&d.requestFullscreen)d.requestFullscreen({navigationUI:'hide'}).then(()=>{try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
 function toggleFull(){try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else goFull();}catch(e){}}
@@ -1625,6 +1633,7 @@ function playerInput(dt){
     controlTank(t,{thr:clamp(+i.thr||0,-1,1),st:clamp(+i.st||0,-1,1),ax:+i.ax||t.x,ay:+i.ay||t.y,trig:!!i.trig&&!pick,fresh:fresh&&!pick,pr:170},dt);}
 }
 /* ================= flow & hangar ================= */
+{const v=(document.querySelector('meta[name="ironfield-version"]')||{}).content;$('#buildTag').textContent='Build '+(v||'dev');}
 const hangarEl=$('#hangar'),overEl=$('#over'),pausedEl=$('#paused'),toastEl=$('#toast');
 let viewId=save.sel,toastT=0,last=performance.now();
 function toast(msg){toastEl.textContent=msg;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{toastEl.hidden=true;},2600);}
@@ -1657,8 +1666,8 @@ function start(fromWave){
 }
 function togglePause(){
   if(net.mode!=='off'&&(state==='play')){menuOpen=!menuOpen;pausedEl.hidden=!menuOpen;releaseInputs();document.body.classList.toggle('playing',!menuOpen);
-    const host=net.mode==='host';$('#pauseNote').textContent='Co-op keeps running while this menu is open. Press P, Esc or Enter to get back in. '+(host?'You are the host: ending the battle sends everyone back to the hangar.':'Nobody leaves mid-battle: you return to the hangar when the squad is wiped out or the host ends the battle.');
-    const q=$('#quitBtn');q.hidden=!host;q.textContent='End battle for everyone';endArm=0;if(!menuOpen)dropFocus();return;}
+    const host=net.mode==='host';$('#pauseNote').textContent='Co-op keeps running while this menu is open. Press P, Esc or Enter to get back in. '+(host?'You are the host: ending the battle sends everyone back to the hangar.':'Between waves you can go back to the hangar and join again whenever you like, but a wave cleared while you are away gives you no RP.');
+    const q=$('#quitBtn');q.hidden=!host&&phase!=='break';q.textContent=host?'End battle for everyone':'Return to hangar';endArm=0;if(!menuOpen)dropFocus();return;}
   if(state==='play'){state='pause';releaseInputs();pausedEl.hidden=false;$('#quitBtn').hidden=false;$('#quitBtn').textContent='Return to hangar';document.body.classList.remove('playing');touchUI.hidden=true;}
   else if(state==='pause'){state='play';releaseInputs();pausedEl.hidden=true;document.body.classList.add('playing');touchUI.hidden=!(coarse||touchMode);dropFocus();last=performance.now();}
 }
@@ -1689,7 +1698,7 @@ $('#cpBtn').addEventListener('click',()=>start(runCp));
 $('#hangarBtn').addEventListener('click',()=>toHangar());
 $('#resumeBtn').addEventListener('click',()=>{if(state==='pause'||menuOpen)togglePause();});
 let endArm=0;
-$('#quitBtn').addEventListener('click',()=>{if(net.mode==='guest'&&state==='play')return;if(net.mode==='host'&&state==='play'){if(Date.now()-endArm>3000){endArm=Date.now();$('#quitBtn').textContent='Click again to end the battle';return;}}toHangar();});
+$('#quitBtn').addEventListener('click',()=>{if(net.mode==='guest'&&state==='play'){benchMe();return;}if(net.mode==='host'&&state==='play'){if(Date.now()-endArm>3000){endArm=Date.now();$('#quitBtn').textContent='Click again to end the battle';return;}}toHangar();});
 pausedEl.addEventListener('pointerdown',e=>{if(e.target===pausedEl&&(state==='pause'||menuOpen))togglePause();});
 document.addEventListener('visibilitychange',()=>{releaseInputs();if(document.hidden){try{if(eng&&AC)eng.g.gain.setValueAtTime(0,AC.currentTime);}catch(e){}if(state==='play'&&net.mode==='off')togglePause();}else last=performance.now();});
 let lastListMode=null;window.addEventListener('resize',()=>{if(state==='hangar'&&(window.innerWidth<640)!==lastListMode)renderHangar();});
@@ -1760,7 +1769,7 @@ function renderDetail(){
   const reload=T.cl?T.cl+' × '+T.it+' s, '+T.rl+' s reload':T.rl+' s';
   let action;
   if(st==='owned'&&hangarMode==='mp'&&net.mode==='off')action='<button class="btn" type="button" disabled>Deploy</button><span class="why">Host a room or join one above to deploy in co-op. Switch to Solo to play alone.</span>';
-  else if(st==='owned')action=net.mode==='guest'?(net.remote.st&&net.connected?'<button class="btn" id="readyBtn" type="button">Join the battle</button><span class="why">'+mateName()+' is already fighting. You drop in next to them in this tank.</span>':T.id===net.myTank?'<button class="btn" type="button" disabled>Ready in this tank</button><span class="why">'+mateName()+' (host) deploys both of you.</span>':'<button class="btn" id="readyBtn" type="button">Use in co-op</button>'):'<button class="btn" id="deployBtn" type="button">'+(net.mode==='host'&&net.connected?'Deploy squad':'Deploy')+'</button>'+(net.mode==='host'&&!net.connected?'<span class="why">No teammate yet. You can start anyway: they can join mid-battle with the code.</span>':'')+startAtHTML();
+  else if(st==='owned')action=net.mode==='guest'?(net.remote.st&&net.connected?'<button class="btn" id="readyBtn" type="button">Join the battle</button><span class="why">'+mateName()+' is already fighting. You drop in next to them in this tank. Only players on the field get RP when a wave is cleared.</span>':T.id===net.myTank?'<button class="btn" type="button" disabled>Ready in this tank</button><span class="why">'+mateName()+' (host) deploys both of you.</span>':'<button class="btn" id="readyBtn" type="button">Use in co-op</button>'):'<button class="btn" id="deployBtn" type="button">'+(net.mode==='host'&&net.connected?'Deploy squad':'Deploy')+'</button>'+(net.mode==='host'&&!net.connected?'<span class="why">No teammate yet. You can start anyway: they can join mid-battle with the code.</span>':'')+startAtHTML();
   else if(T.admin)action='<button class="btn" type="button" disabled>Admin only</button><span class="why">Unlocked only by the admin button at the bottom of the hangar.</span>';
   else if(st==='open'){const ok=save.rp>=T.cost;action='<button class="btn" id="researchBtn" type="button"'+(ok?'':' disabled')+'>Research · '+fmt(T.cost)+' RP</button>'+(ok?'':'<span class="why">Need '+fmt(T.cost-save.rp)+' more RP</span>');}
   else action='<button class="btn" type="button" disabled>Locked</button><span class="why">Research the '+(pre?pre.name:'previous tier')+' first</span>';
@@ -2319,6 +2328,7 @@ function hostData(pe,d){
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o};return;}
   if(d.e==='act'){if(!rateOk(pe.acts,1000,8))return;const t=pe.t;if(t&&t.alive&&state==='play'&&['ext','rep','arty','ord'].includes(d.a))doAct(t,d.a,num(d.x,0,WW),num(d.y,0,WH));return;}
   if(d.e==='vote'){if(phase==='break'&&pe.t&&state==='play'){if(votes.has(pe.pid))votes.delete(pe.pid);else votes.add(pe.pid);}return;}
+  if(d.e==='bench'){if(!rateOk(pe.acts,1000,8))return;if(state==='play'&&phase==='break'&&pe.t){dropPeerTank(pe,(pe.name||'A player')+' went back to the hangar');sendTo(pe,{e:'benched'});net.lobbyKey='';sendLobby();}else sendTo(pe,{e:'nobench'});return;}
   if(d.e==='swap'){const T=tget(d.tank);if(T&&!T.admin){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
   if(d.e==='chat'){if(!rateOk(pe.chatIn,5000,6))return;const t=cleanText(d.text);if(!t)return;const who=pe.name||'Guest';addChat(who,t,'them');sfx.ping();
     const j=JSON.stringify({e:'chat',from:who,text:t});for(const o of peerList())if(o!==pe)sendTo(o,j);return;}
@@ -2328,7 +2338,7 @@ function spawnPeerTank(pe,x,y,a){const T=tget(pe.tank);if(!T||T.admin)return nul
 function sendStart(pe){if(!pe.t||!player)return;const have=new Set(obs.map(o=>o.id)),gone=[];for(let i=0;i<obsTotal;i++)if(!have.has(i))gone.push(i);
   sendTo(pe,{e:'start',seed:curSeed,mw:WW,mh:WH,you:pe.t.nid,host:player.nid,w:wave,gone,fall:trees.filter(t=>t.fallen).map(t=>[t.i,r2(t.fa)]),cr:craters.slice(-100).map(c=>[r1(c.x),r1(c.y),r1(c.r),c.nuke?1:0])});}
 function hotJoin(pe){const mate=humans().find(h=>h.alive)||player;if(!mate)return;const sp=freeSpotNear(mate.x,mate.y);if(!spawnPeerTank(pe,sp.x,sp.y,mate.a))return;
-  pe.stats=newStats();pe.t.stats=pe.stats;sendStart(pe);sayAll(pe.name+' joined the battle in the '+pe.t.T.name,'#8bd66e');net.lobbyKey='';sendLobby();}
+  sendStart(pe);sayAll(pe.name+' joined the battle in the '+pe.t.T.name,'#8bd66e');net.lobbyKey='';sendLobby();}
 let bgTimer=null;
 function netHeartbeat(){if(net.mode==='off')return;const now=performance.now();
   if(net.mode==='host'){for(const pe of peerList()){if(now-pe.pingAt>2000){pe.pingAt=now;sendTo(pe,{e:'ping',t:now});}if(now-pe.lastRx>9000)peerClosed(pe);}return;}
@@ -2394,6 +2404,8 @@ function guestData(d){
   if(d.e==='snap'){if(state==='play'||state==='pause'||state==='over'){try{applySnap(d);}catch(err){}}return;}
   if(d.e==='over'){if(state==='play')showOver(d.st,d.tank,d.why,d.w,d.cl,true);return;}
   if(d.e==='bye'){net.remote.st=0;if(state!=='hangar'){toHangar(true);toast(mateName()+' ended the battle');}coopUI();return;}
+  if(d.e==='benched'){net.benchAt=0;if(state==='play'||state==='pause'){toHangar(true);toast('Back in the hangar. Join the battle again whenever you like.');}return;}
+  if(d.e==='nobench'){net.benchAt=0;toast('The next wave already started. You can go back between waves.');return;}
   if(d.e==='full'){toast('That room is full');leaveCoop();coopStatus('That room already has '+MAX_PLAYERS+' players.',true);return;}
 }
 function guestStart(m){
