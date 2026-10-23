@@ -5,7 +5,7 @@ name: Release
 on:
   push:
     branches: [main]
-    paths: ['web/**']
+    paths: ['web/index.html']
   workflow_dispatch:
 permissions:
   contents: write
@@ -19,7 +19,7 @@ jobs:
 
       - name: Stamp the build number (same as the site, so both hash the same file)
         run: |
-          BUILD="$(git rev-list --count HEAD -- web)"
+          BUILD="$(git rev-list --count HEAD -- web/index.html)"
           sed -i "s|<meta name=\"ironfield-version\" content=\"\">|<meta name=\"ironfield-version\" content=\"$BUILD\">|" web/index.html
           grep -q "name=\"ironfield-version\" content=\"$BUILD\"" web/index.html || { echo "::error::Could not stamp the build number (ironfield-version meta missing from web/index.html)"; exit 1; }
           echo "BUILD=$BUILD" >> "$GITHUB_ENV"
@@ -48,7 +48,7 @@ jobs:
           body: |
             **Play in the browser:** ${{ env.GAME_URL }} (always the newest version, works on phones and PC).
 
-            **ironfield.html** is an offline copy for PC: save it and double-click it. When a new version is out it shows a banner with a download button.
+            **ironfield.html** is an offline copy for PC (solo only; multiplayer works on the website). Save it and double-click it. When a new version is out it shows a banner with a download button.
 
             Game version `${{ env.GAME_VERSION }}`.
           files: |

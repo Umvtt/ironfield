@@ -26,17 +26,17 @@ jobs:
       - uses: actions/configure-pages@v5
       - name: Stamp the build number
         run: |
-          BUILD="$(git rev-list --count HEAD -- web)"
+          BUILD="$(git rev-list --count HEAD -- web/index.html)"
           sed -i "s|<meta name=\"ironfield-version\" content=\"\">|<meta name=\"ironfield-version\" content=\"$BUILD\">|" web/index.html
           grep -q "name=\"ironfield-version\" content=\"$BUILD\"" web/index.html || { echo "::error::Could not stamp the build number (ironfield-version meta missing from web/index.html)"; exit 1; }
       - name: Write version.json
-        env:
-          NOTES: ${{ github.event.head_commit.message }}
         run: |
+          # "What's new" comes from the last commit that changed the game itself, so edits to codes.json stay quiet
+          NOTES="$(git log -1 --format=%B -- web/index.html)"
           VERSION="$(sha256sum web/index.html | cut -c1-12)"
           # the rest of the commit message (minus sign-off lines) is the "What's new" list shown in the game's menu
           DETAILS="$(printf '%s\n' "$NOTES" | tail -n +2 | grep -v -E '^(Co-Authored-By|Claude-Session|Signed-off-by):' | sed '/./,$!d')"
-          BUILD="$(git rev-list --count HEAD -- web)"
+          BUILD="$(git rev-list --count HEAD -- web/index.html)"
           jq -n --arg v "$VERSION" --arg n "$(printf '%s' "$NOTES" | head -n1)" --arg d "$DETAILS" --arg b "$BUILD" '{version: $v, notes: $n, details: $d, build: $b}' > web/version.json
           cat web/version.json
       - uses: actions/upload-pages-artifact@v3
