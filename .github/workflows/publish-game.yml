@@ -34,7 +34,10 @@ jobs:
           NOTES: ${{ github.event.head_commit.message }}
         run: |
           VERSION="$(sha256sum web/index.html | cut -c1-12)"
-          jq -n --arg v "$VERSION" --arg n "$(printf '%s' "$NOTES" | head -n1)" '{version: $v, notes: $n}' > web/version.json
+          # the rest of the commit message (minus sign-off lines) is the "What's new" list shown in the game's menu
+          DETAILS="$(printf '%s\n' "$NOTES" | tail -n +2 | grep -v -E '^(Co-Authored-By|Claude-Session|Signed-off-by):' | sed '/./,$!d')"
+          BUILD="$(git rev-list --count HEAD -- web)"
+          jq -n --arg v "$VERSION" --arg n "$(printf '%s' "$NOTES" | head -n1)" --arg d "$DETAILS" --arg b "$BUILD" '{version: $v, notes: $n, details: $d, build: $b}' > web/version.json
           cat web/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
