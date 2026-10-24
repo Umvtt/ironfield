@@ -718,11 +718,12 @@ function planeShoot(t,g,i){const T=t.T,spread=(t.team==='p'?.012:.03)+(g.c>=30?.
   shells.push({kind:'bullet',x:ox,y:oy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,owner:t,T,g,dist:0,maxD:(g.c>=30?620:560)*(t.team==='p'?1.15:1),ground:t.alt<(t.team==='p'?.7:.6),lastTree:null,penMul:1});
   if(t.stats)t.stats.shots++;if(t===player)shotsF++;}
 /* bomber gunners shoot back at human aircraft that come close */
-function gunnersFire(t,dt){t.gunnerT=(t.gunnerT||0)-dt;if(t.gunnerT>0)return;t.gunnerT=.22;let best=null,bd=t.T.L>100?520:430;
+/* your own bombers' gunners fire faster, straighter and further than the enemy's */
+function gunnersFire(t,dt){const mine=t.team==='p';t.gunnerT=(t.gunnerT||0)-dt;if(t.gunnerT>0)return;t.gunnerT=mine?.14:.22;let best=null,bd=(t.T.L>100?520:430)*(mine?1.25:1);
   for(const o of tanks){if(!o.air||!o.alive||o.team===t.team)continue;const d=Math.hypot(o.x-t.x,o.y-t.y);if(d<bd){bd=d;best=o;}}
   if(!best)return;const n=t.comps.filter(c=>c.kind==='crew'&&c.role==='gunner'&&c.alive).length;if(!n)return;
-  const lead=bd/BULLET_V,ax=best.x+best.vx*lead-t.x,ay=best.y+best.vy*lead-t.y,a=Math.atan2(ay,ax)+rand(-.09,.09),sp=BULLET_V;
-  const tg=t.T.tg||12.7;fx({k:'muzp',x:r1(t.x),y:r1(t.y),a:r3(a),n:t.nid,c:tg});const g={c:tg,pe:tg>=20?22:tg>=12?25:9,d:(tg>=20?9:tg>=12?6:4)*n*(t.team==='p'?1.2:1),fr:4};shells.push({kind:'bullet',x:t.x,y:t.y,vx:Math.cos(a)*sp+t.vx,vy:Math.sin(a)*sp+t.vy,owner:t,T:t.T,g,dist:0,maxD:470,ground:false,gunner:true,lastTree:null,penMul:1});}
+  const lead=bd/BULLET_V,ax=best.x+best.vx*lead-t.x,ay=best.y+best.vy*lead-t.y,a=Math.atan2(ay,ax)+(mine?rand(-.045,.045):rand(-.09,.09)),sp=BULLET_V;
+  const tg=t.T.tg||12.7;fx({k:'muzp',x:r1(t.x),y:r1(t.y),a:r3(a),n:t.nid,c:tg});const g={c:tg,pe:tg>=20?22:tg>=12?25:9,d:(tg>=20?9:tg>=12?6:4)*n*(mine?1.45:1),fr:4};shells.push({kind:'bullet',x:t.x,y:t.y,vx:Math.cos(a)*sp+t.vx,vy:Math.sin(a)*sp+t.vy,owner:t,T:t.T,g,dist:0,maxD:mine?600:470,ground:false,gunner:true,lastTree:null,penMul:1});}
 function planeOrd(t){const T=t.T;if(!t.air||!t.alive)return;if(!T.ord){say(t,'This aircraft carries no bombs or rockets','#8e8a6b');return;}
   if(t.ordLeft<=0){say(t,T.ord.lab+': rearming, '+Math.ceil(t.ordCD)+' s','#8e8a6b');return;}if(t.dropCD>0||t.stick>0)return;
   if(T.ord.k==='rocket'){const n=Math.min(2,t.ordLeft);for(let i=0;i<n;i++)fireRocket(t,i?1:-1);t.ordLeft-=n;t.dropCD=.35;}
@@ -759,8 +760,8 @@ function shotVsPlanes(s,ax,ay,bx,by){const own=s.owner,air=s.kind==='bullet',fla
     if(!air&&!flak&&t.alt>.45)continue;
     const R=t.T.hitR+(flak&&s.T.fz?s.T.fz:0)+(air?(isHuman(own)?5:2):0);if(segCircle(ax,ay,bx,by,t.x,t.y,R)<0)continue;
     if(air){const g=s.g;planeHit(t,g.d,g.pe,own,'gun');fx({k:'spark',x:r1(t.x+rand(-6,6)),y:r1(t.y+rand(-6,6))});return true;}
-    if(flak&&s.T.fz){const dmg=(s.T.c<=20?30:s.T.c<=30?45:s.T.c<=40?80:130)*.8,inner=segCircle(ax,ay,bx,by,t.x,t.y,t.T.hitR)>=0;planeHit(t,dmg*(inner?1.25:.7),40,own,s.T.c>30?'flak':'flak1');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
-    if(flak){planeHit(t,(s.T.c<=8?14:s.T.c<=13?24:40)*.8,s.T.pe,own,'gun');fx({k:'spark',x:r1(s.x),y:r1(s.y)});return true;}
+    if(flak&&s.T.fz){const dmg=(s.T.c<=20?30:s.T.c<=30?45:s.T.c<=40?80:130)*1.05,inner=segCircle(ax,ay,bx,by,t.x,t.y,t.T.hitR)>=0;planeHit(t,dmg*(inner?1.25:.7),40,own,s.T.c>30?'flak':'flak1');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
+    if(flak){planeHit(t,(s.T.c<=8?14:s.T.c<=13?24:40)*1.05,s.T.pe,own,'gun');fx({k:'spark',x:r1(s.x),y:r1(s.y)});return true;}
     planeHit(t,60+s.T.c*1.8,s.T.pe,own,'gun');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
   return false;}
 /* aircraft cannon from above: roof armor, steep angle (about 45 degrees) */
