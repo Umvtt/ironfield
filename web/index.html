@@ -47,6 +47,8 @@ body.playing canvas#game{cursor:none}
 .news b{font-size:18px;color:var(--khaki);font-weight:600;line-height:1.25;overflow-wrap:anywhere}
 .news ul{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px;color:var(--khaki);font-size:15px;line-height:1.35}
 .news li{overflow-wrap:anywhere}
+.live-bar{border-left-color:var(--ok,#8bd66e)}.live-bar p{margin:0;color:var(--khaki);font-size:16px;line-height:1.35;overflow-wrap:anywhere}.live-bar p.ev{color:var(--signal);font-weight:600}.live-bar p.mt{color:#ee5d50}
+.bdg{color:var(--signal);font-size:12px;font-weight:600;margin-left:6px;white-space:nowrap}
 .build{align-self:flex-end;margin-top:-6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim);opacity:.7}
 .mast{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;border-bottom:2px solid var(--line);padding-bottom:12px}
 h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,9vw,92px);line-height:.86;margin:0;color:var(--signal);letter-spacing:.02em}
@@ -251,6 +253,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       </div>
     </div>
     <p class="lede">Hold the field against waves of enemy armor. There are no hit points: a shell has to get through the armor, and then the spall and explosive filler have to knock out enough of the crew or set off the ammunition. Research vehicles across five nations with the points you earn.</p>
+    <section class="news live-bar" id="liveBar" hidden aria-label="News"></section>
     <section class="news" id="news" hidden aria-label="What's new">
       <div class="news-h"><span class="tag" id="newsTag">What's new</span><button class="btn ghost small" id="newsBtn" type="button">Show all</button></div>
       <b id="newsTitle"></b>
@@ -983,11 +986,12 @@ function normSave(s){const o=freshSave();if(!s||typeof s!=='object'||!Array.isAr
   o.sel=TYPE[s.sel]&&o.owned.includes(s.sel)?s.sel:'m4a1';o.nation=NAT[s.nation]?s.nation:TYPE[o.sel].nation;return o;}
 const cleanName=v=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,'').replace(/\s+/g,' ').trim().slice(0,16);
 const cleanText=v=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,' ').replace(/\s+/g,' ').trim().slice(0,120);
-let store={active:0,slots:[null,null,null],coop:null,name:'',lastCode:''};
+let store={active:0,slots:[null,null,null],coop:null,name:'',lastCode:'',badge:'',dev:''};
+const cleanBt=v=>typeof v==='string'&&/^[A-Z2-9]{10}\.[A-Z2-9]{12}$/.test(v)?v:'';
 try{
   const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
   if(raw&&Array.isArray(raw.slots)){store.active=clamp(Math.round(+raw.active||0),0,SLOTS-1);store.slots=[0,1,2].map(i=>raw.slots[i]?normSave(raw.slots[i]):null);
-    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);}
+    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);}
   else{/* first run of this version: the old single save becomes slot 1 */
     let s=JSON.parse(localStorage.getItem('ironfield-save-v3')||'null');
     if(!s){const old=JSON.parse(localStorage.getItem('ironfield-save-v2')||'null');
@@ -998,6 +1002,7 @@ try{
 if(!store.slots[store.active])store.slots[store.active]=freshSave();
 if(!store.coop)store.coop=freshSave();
 if(!store.name)store.name='Tanker-'+(100+Math.floor(Math.random()*900));
+if(!store.dev)store.dev=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
 let save=store.slots[store.active];
 function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(store));}catch(e){}}
 persist();
@@ -1089,7 +1094,7 @@ function destroyObstacle(o,quiet,by){
   if(!removeObs(o))return;
   fx({k:'obs',id:o.id,x:r1(o.x),y:r1(o.y),w:r1(o.w),h:r1(o.h)});
   if(o.kind==='fuel'&&net.mode!=='guest')fuelQ.push({x:o.x+o.w/2,y:o.y+o.h/2,by,at:time+rand(.05,.25)});
-  if(o.hangar==='e'&&net.mode!=='guest'&&!obs.some(q=>q.hangar==='e')){sayAll('Enemy airfield destroyed: their aircraft now have to fly in from far away','#8bd66e');if(isHuman(by))rpFor(by,400);}
+  if(o.hangar==='e'&&net.mode!=='guest'&&!obs.some(q=>q.hangar==='e')){sayAll('Enemy airfield destroyed: their aircraft now have to fly in from far away','#8bd66e');if(isHuman(by))rpFor(by,Math.round(400*rpMul()));}
   if(!quiet){buildNav();reachFromHumans();navDirty=true;}
 }
 function reachFromHumans(){const h=humans().find(t=>t.alive)||player;if(h)computeReach(h.x,h.y);}
@@ -1401,7 +1406,7 @@ function kill(t,by,cause){
   if(!air)fx({k:'kill',x:r1(t.x),y:r1(t.y),b:big?1:0,w:t.T.W,n:t.nid});else fx({k:'boom',x:r1(t.x),y:r1(t.y),f:900});
   const why=typeof cause==='string'&&cause.startsWith('air:')?cause.slice(4):air&&cause==='crew'?'shot down':{ammo:'ammo rack detonated',crew:'crew knocked out',fire:'burned out',french:'spontaneously exploded',nuke:'nuked',crushed:'crushed'}[cause]||'destroyed';
   if(t.team==='e'){
-    if(isHuman(by)&&cause!=='nuke'&&cause!=='french'){const pt=Math.min(5,by.T.tier),et=t.T.tier,rp=Math.round(25*et*(1+.25*clamp(et-pt,-1,2)));
+    if(isHuman(by)&&cause!=='nuke'&&cause!=='french'){const pt=Math.min(5,by.T.tier),et=t.T.tier,rp=Math.round(25*et*(1+.25*clamp(et-pt,-1,2))*rpMul());
       if(by.stats)by.stats.kills++;if(by===player)kills++;rpFor(by,rp);
       say(by,t.T.name+': '+why+'  +'+rp+' RP','#f2a23a');floatFor(by,t.x,t.y-30,'DESTROYED +'+rp+' RP','#f2a23a');
       for(const h of humans())if(h!==by)say(h,nameOf(by)+' destroyed the '+t.T.name,'#8e8a6b');}
@@ -1653,7 +1658,7 @@ function clearWrecks(now){let n=0;for(const t of tanks.slice()){if(t.alive||isHu
   if(n)navDirty=true;fx({k:'clean'});}
 function trimSmoke(){for(const p of parts)if(!p.glow&&p.grow>=8)p.life=Math.min(p.life,.7);}
 function waveCleared(){
-  const lead=humans().reduce((a,b)=>b.T.tier>a.T.tier?b:a),pt=Math.min(5,lead.T.tier),rp=Math.round((100+50*wave)*[1,1.25,1.5,1.8,2.2][pt-1]);
+  const lead=humans().reduce((a,b)=>b.T.tier>a.T.tier?b:a),pt=Math.min(5,lead.T.tier),rp=Math.round((100+50*wave)*[1,1.25,1.5,1.8,2.2][pt-1]*rpMul());
   for(const h of humans())rpFor(h,rp);
   if(wave>save.best){save.best=wave;persist();}
   for(const h of humans())if(h.alive)resupply(h);else respawn(h);
@@ -2025,16 +2030,47 @@ $('#langSel').addEventListener('change',e=>setLang(e.target.value));setLang(lang
 /* redeem codes: a small Cloudflare Worker (tools/codes-worker.js, address in codes.json) checks each code's signature and
    remembers used ones, so every code works for exactly one person. Perks live in PERK for this page session only.
    Guests pass the worker's ticket to the host, who asks the worker to confirm it before allowing admin vehicles. */
-const PERKS={all_vehicles(){PERK.all=true;}};
 let codeApi=null;
 async function codeAPI(){if(codeApi!==null)return codeApi;try{const r=await fetch('codes.json?t='+Date.now(),{cache:'no-store'});const c=r.ok?await r.json():null;codeApi=c&&typeof c.api==='string'&&/^https:\/\/[a-z0-9.-]+(\/[a-z0-9._-]*)?$/i.test(c.api)?c.api.replace(/\/$/,''):'';}catch(e){codeApi='';}return codeApi;}
 async function codeCall(path,body){const api=await codeAPI();if(!api)return{ok:false,reason:'setup'};try{const r=await fetch(api+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return await r.json();}catch(e){return{ok:false,reason:'net'};}}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
 async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
-  const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce});
-  if(!r||!r.ok){msg.textContent={used:'Already used',off:'Switched off',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
-  for(const k of r.perks||[])if(PERKS[k])PERKS[k]();net.perkTk=cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket});if(net.mode==='guest'&&net.connected)netSend({e:'perk',tk:net.perkTk});
-  $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent='Done · until you close the game';fixSel();renderHangar();coopUI();}
+  const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name});
+  if(!r||!r.ok){msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
+  const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],slot=()=>store.slots[store.active]||(store.slots[store.active]=freshSave());
+  for(const k of perks){if(typeof k!=='string')continue;
+    if(k==='all_vehicles'){PERK.all=true;net.perkTk=cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket});if(net.mode==='guest'&&net.connected)netSend({e:'perk',tk:net.perkTk});done.push('Every vehicle until you close the game');}
+    /* RP and vehicle codes go into your own save slot for good (as a guest you see them after leaving the room) */
+    else if(/^rp:\d{1,7}$/.test(k)){const n=clamp(+k.slice(3),1,1e6);slot().rp+=n;persist();done.push('+'+fmt(n)+' RP in slot '+(store.active+1));}
+    else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){const sl=slot();if(!sl.owned.includes(T.id))sl.owned.push(T.id);if(!sl.earned.includes(T.id))sl.earned.push(T.id);persist();done.push(T.name+' unlocked in slot '+(store.active+1));}else done.push('That vehicle is not in this version of the game');}
+    else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge});
+      done.push((cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op');}}
+  $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent=done.join(' · ')||'Done';fixSel();renderHangar();coopUI();if(net.mode==='host')sendLobby(true);}
+/* live settings from the server (news, RP events, maintenance, oldest build allowed), refreshed every 5 minutes */
+let LIVE={news:{on:false,text:''},rp:{mul:1,until:0},maint:{on:false,text:''},minBuild:0};
+const liveTxt=(v,n)=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,' ').slice(0,n);
+function rpMul(){const r=LIVE.rp;return r.mul>1&&(!r.until||Date.now()<r.until)?r.mul:1;}
+async function liveCfg(){const api=await codeAPI();if(!api)return;try{const r=await fetch(api+'/config',{cache:'no-store'});const c=r.ok?await r.json():null;if(!c||typeof c!=='object')return;
+    const n=c.news||{},rp=c.rp||{},m=c.maint||{};
+    LIVE={news:{on:!!n.on,text:liveTxt(n.text,300)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6))};}
+  catch(e){return;}renderLive();
+  if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
+    let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
+    if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}else showUpdateBar(b);}}
+function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';const add=(t,c)=>{const p=document.createElement('p');p.textContent=t;if(c)p.className=c;el.append(p);};
+  if(LIVE.news.on&&LIVE.news.text)add(LIVE.news.text);
+  const m=rpMul();if(m>1)add((m===2?'Double':m===3?'Triple':m+'×')+' RP event'+(LIVE.rp.until?' · until '+new Date(LIVE.rp.until).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}):''),'ev');
+  if(LIVE.maint.on)add(LIVE.maint.text||'Multiplayer is closed for maintenance. Solo still works.','mt');
+  el.hidden=!el.childNodes.length;}
+/* verified badges: every player checks the tokens they see with the server, and a badge only shows under the callsign it was given to */
+const BADGE=new Map();
+function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BADGE.has(tk)))].slice(0,20);if(!need.length)return;for(const tk of need)BADGE.set(tk,null);
+  codeCall('/badge',{tks:need}).then(r=>{if(!r||!r.ok||!r.labels||typeof r.labels!=='object'){for(const tk of need)BADGE.delete(tk);return;}
+    for(const tk of need){const v=r.labels[tk];BADGE.set(tk,v&&typeof v==='object'?{l:cleanName(v.l),n:cleanName(v.n).toLowerCase()}:null);}renderSquad();renderChat();});}
+function badgeTkOf(name){if(!name)return '';const lo=String(name).toLowerCase();
+  if(net.mode==='guest'){const r=net.squad.find(r=>r[0].toLowerCase()===lo);return r&&r[4]||'';}
+  if(lo===store.name.toLowerCase())return store.badge;const pe=net.mode==='host'?peerList().find(p=>(p.name||'').toLowerCase()===lo):null;return pe&&pe.btOk||'';}
+function badgeFor(name){const tk=badgeTkOf(name),v=tk&&BADGE.get(tk);return v&&v.l&&v.n===String(name).toLowerCase()?v.l:'';}
 $('#rdmBtn').addEventListener('click',()=>{const b=$('#rdmBox');b.hidden=!b.hidden;if(!b.hidden)$('#rdmIn').focus();});
 $('#rdmGo').addEventListener('click',redeem);$('#rdmIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();redeem();}});
 /* browsers that support it offer "Install": the site then opens full screen from a home-screen icon, like an app */
@@ -2136,7 +2172,7 @@ function renderDetail(){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);
 }
@@ -2151,7 +2187,7 @@ function renderAirDetail(T,row,action){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);}
 function drawPreview(T){const c=$('#preview');if(!c)return;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle=T.air?'#33402c':'#2c3420';g.fillRect(0,0,c.width,c.height);
@@ -2430,7 +2466,7 @@ function draw(dt){
     const n=t.crewMax,pw=6/ZOOM,gap=2/ZOOM,tot=n*pw+(n-1)*gap;let i=0;for(const c of t.comps){if(c.kind!=='crew')continue;ctx.fillStyle=c.alive?(c.hp<c.max*.5?'#ebd257':'#ee5d50'):'rgba(0,0,0,.6)';ctx.fillRect(t.x-tot/2+i*(pw+gap),y,pw,4/ZOOM);i++;}
     if(mapView){ctx.strokeStyle='#ee5d50';ctx.lineWidth=2/ZOOM;ctx.beginPath();ctx.arc(t.x,t.y,14/ZOOM,0,TAU);ctx.stroke();}}
   for(const t of tanks){if(t.team!=='p'||!t.alive||t===player||!vis(t.x,t.y,t.T.R+40))continue;const y=t.y-t.T.R-14,fs=11/ZOOM;
-    ctx.font='600 '+fs+'px "IBM Plex Mono",monospace';const name=nameOf(t)+' · '+t.T.name.toUpperCase();ctx.lineWidth=3/ZOOM;ctx.strokeStyle='rgba(10,12,8,.7)';ctx.strokeText(name,t.x,y-6/ZOOM);ctx.fillStyle='#8bd66e';ctx.fillText(name,t.x,y-6/ZOOM);
+    ctx.font='600 '+fs+'px "IBM Plex Mono",monospace';const nm=nameOf(t),bd=badgeFor(nm),name=(bd?'★ '+bd.toUpperCase()+' · ':'')+nm+' · '+t.T.name.toUpperCase();ctx.lineWidth=3/ZOOM;ctx.strokeStyle='rgba(10,12,8,.7)';ctx.strokeText(name,t.x,y-6/ZOOM);ctx.fillStyle='#8bd66e';ctx.fillText(name,t.x,y-6/ZOOM);
     if(mapView){ctx.strokeStyle='#8bd66e';ctx.lineWidth=2/ZOOM;ctx.beginPath();ctx.arc(t.x,t.y,14/ZOOM,0,TAU);ctx.stroke();}}
   if(player&&player.alive&&!player.air&&vis(player.x,player.y,player.T.R+40)){const fs=11/ZOOM;ctx.font='600 '+fs+'px "IBM Plex Mono",monospace';ctx.textAlign='center';ctx.lineWidth=3/ZOOM;ctx.strokeStyle='rgba(10,12,8,.7)';const y=player.y-player.T.R-20/ZOOM;ctx.strokeText(store.name,player.x,y);ctx.fillStyle='#d8cfa2';ctx.fillText(store.name,player.x,y);}
   if(mapView&&player){ctx.strokeStyle='#8bd66e';ctx.lineWidth=2/ZOOM;ctx.beginPath();ctx.arc(player.x,player.y,16/ZOOM,0,TAU);ctx.stroke();}
@@ -2671,7 +2707,7 @@ function hud(){
    Star layout: the host's browser runs the whole battle for up to 14 players. Every guest sends inputs and
    actions (~30 Hz) and draws snapshots plus a stream of effect events. PeerJS only brokers the first handshake;
    game traffic then flows browser to browser over WebRTC. Everything that arrives is parsed and clamped before use. */
-const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=4;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
+const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=5;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
 function loadPeer(){return new Promise((res,rej)=>{if(window.Peer)return res(window.Peer);const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';sc.onload=()=>window.Peer?res(window.Peer):rej(new Error('load failed'));sc.onerror=()=>rej(new Error('load failed'));document.head.appendChild(sc);});}
 let Transport={
@@ -2709,7 +2745,8 @@ const mateName=()=>net.remote.name||'The host';
 function nameOf(t){if(!t)return 'Teammate';if(t===player)return store.name;if(t.ally)return 'AI '+t.T.name;if(t.peer)return t.peer.name||'Teammate';return net.names[t.nid]||'Teammate';}
 function squadCount(){return net.mode==='host'?1+peerList().length:net.mode==='guest'?Math.max(1,net.squad.length):1;}
 function coopStatus(text,err){const el=$('#coopStatus');el.textContent=text;el.classList.toggle('err',!!err);const d=$('#connDot');d.className='live'+(err?' err':net.connected?' ok':net.mode!=='off'?' wait':'');}
-function sendLobby(force){if(net.mode!=='host')return;const list=peerList(),sq=[[store.name,save.sel,0,state==='hangar'?0:1]].concat(list.map(pe=>[pe.name||'Guest',pe.tank||'m4a1',1,pe.t?1:0]));
+function sendLobby(force){if(net.mode!=='host')return;const list=peerList(),seen=new Set([store.badge]);for(const pe of list){pe.btOk=pe.bt&&!seen.has(pe.bt)?pe.bt:'';if(pe.btOk)seen.add(pe.bt);}
+  const sq=[[store.name,save.sel,0,state==='hangar'?0:1,store.badge]].concat(list.map(pe=>[pe.name||'Guest',pe.tank||'m4a1',1,pe.t?1:0,pe.btOk]));
   const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
     k=JSON.stringify([base,pfs]);if(!force&&k===net.lobbyKey)return;net.lobbyKey=k;
   list.forEach((pe,i)=>sendTo(pe,Object.assign({},base,{me:i+1,pf:pfs[i]})));}
@@ -2725,9 +2762,9 @@ function coopUI(light){
   renderSquad();if(!light)renderChat();
   if(state==='hangar'&&!light){renderDetail();$('#modeSolo').setAttribute('aria-disabled',String(!idle));renderFrNote();}
 }
-function mateRow(name,role,T,status,ok,ghost,pe){const d=document.createElement('div');d.className='mate'+(ghost?' ghost':'');
+function mateRow(name,role,T,status,ok,ghost,pe,bdg){const d=document.createElement('div');d.className='mate'+(ghost?' ghost':'');
   const dot=document.createElement('i');dot.className='live'+(ok?' ok':ghost?'':' wait');
-  const w=document.createElement('span');w.className='who';w.textContent=name;
+  const w=document.createElement('span');w.className='who';w.textContent=name;if(bdg){const b=document.createElement('span');b.className='bdg';b.textContent='★ '+bdg;w.append(b);}
   const st=document.createElement('span');st.className='st'+(ok?' ok':'');st.textContent=status;
   const sub=document.createElement('span');sub.className='sub';sub.textContent=role+(T?' · '+T.name+' · '+(T.air?'aircraft':'tier '+(T.admin?'admin':ROMAN[T.tier]))+' · '+NAT[T.nation].name:'');
   d.append(dot,w,st,sub);
@@ -2739,16 +2776,16 @@ function kickPeer(pe){if(net.mode!=='host'||!net.peers.has(pe.pid))return;const 
   sendTo(pe,{e:'kicked'});sysAll(n+' was removed by the host');setTimeout(()=>{if(net.peers.has(pe.pid)){pe.name='';peerClosed(pe);}},300);coopUI();renderHostPanel();}
 function setLocked(v){if(net.mode!=='host')return;net.locked=v;for(const b of[$('#lockBtn'),$('#lockBtn2')])b.textContent=v?'Unlock room':'Lock room';sysAll(v?'The host locked the room: nobody new can join':'The room is open again');}
 function hostRows(box,inGame){box.textContent='';
-  box.append(mateRow(store.name+' (you)','Host',player&&inGame?player.T:TYPE[save.sel],inGame?(player&&player.alive?'Alive':'Down'):state==='hangar'?'In hangar':'In battle',true,false));
+  box.append(mateRow(store.name+' (you)','Host',player&&inGame?player.T:TYPE[save.sel],inGame?(player&&player.alive?'Alive':'Down'):state==='hangar'?'In hangar':'In battle',true,false,null,badgeFor(store.name)));
   for(const pe of peerList()){const t=pe.t,st=inGame?(t?(t.alive?'Alive':'Down'):'In hangar'):(t?'In battle':'Ready');
-    box.append(mateRow(pe.name||'Guest','Guest · ping '+(pe.rtt?Math.round(pe.rtt)+' ms':'…')+(pe.stats?' · '+pe.stats.kills+' kills':''),t?t.T:tget(pe.tank),st,!!t||!inGame,false,pe));}
+    box.append(mateRow(pe.name||'Guest','Guest · ping '+(pe.rtt?Math.round(pe.rtt)+' ms':'…')+(pe.stats?' · '+pe.stats.kills+' kills':''),t?t.T:tget(pe.tank),st,!!t||!inGame,false,pe,badgeFor(pe.name)));}
   if(!peerList().length)box.append(mateRow('No guests yet','Room code '+net.code,null,'',false,true));}
 function renderHostPanel(){const w=$('#hostWrap');if(!w)return;const show=net.mode==='host'&&menuOpen;w.hidden=!show;if(show)hostRows($('#hostPanel'),true);}
 setInterval(()=>{if(menuOpen&&net.mode==='host')renderHostPanel();},1000);
 function renderSquad(){const box=$('#squad');if(!box||net.mode==='off')return;box.textContent='';
   if(net.mode==='host'){hostRows(box,false);}
   else{if(!net.connected){box.append(mateRow('Connecting…','Room '+net.code,null,'',false,true));return;}
-    net.squad.forEach((r,i)=>box.append(mateRow(r[0]+(i===net.meIdx?' (you)':''),r[2]?'Guest':'Host',tget(i===net.meIdx?(net.myTank||save.sel):r[1]),r[3]?'In battle':r[2]?'Ready':'In hangar',true,false)));}}
+    net.squad.forEach((r,i)=>box.append(mateRow(r[0]+(i===net.meIdx?' (you)':''),r[2]?'Guest':'Host',tget(i===net.meIdx?(net.myTank||save.sel):r[1]),r[3]?'In battle':r[2]?'Ready':'In hangar',true,false,null,badgeFor(r[0]))));}}
 function renderFrNote(){const g=net.mode==='guest';frBox.disabled=g;frBox.checked=g?!!net.remote.fr:!!save.frBoom;$('#frNote').textContent=g?'(the host decides in co-op: '+(net.remote.fr?'on':'off')+')':net.mode==='host'?'(you are the host: this applies to everyone)':'';}
 /* ---- chat: text only ever goes into textContent or onto the canvas ---- */
 function addChat(who,text,kind){net.chat.push({who,text,kind});if(net.chat.length>60)net.chat.shift();renderChat();
@@ -2756,7 +2793,7 @@ function addChat(who,text,kind){net.chat.push({who,text,kind});if(net.chat.lengt
 function renderChat(){const box=$('#chatLog');if(!box||net.mode==='off')return;box.textContent='';
   if(!net.chat.length){const e=document.createElement('div');e.className='sys';e.textContent='Chat with your squad here. In battle press Enter (or CHAT on a phone).';box.append(e);}
   for(const c of net.chat){const d=document.createElement('div');d.className='m '+c.kind;
-    if(c.kind==='sys'){d.className='sys';d.textContent=c.text;}else{const n=document.createElement('span');n.className='n';n.textContent=c.who+': ';d.append(n,document.createTextNode(c.text));}box.append(d);}
+    if(c.kind==='sys'){d.className='sys';d.textContent=c.text;}else{const n=document.createElement('span');n.className='n';n.textContent=c.who;const bd=badgeFor(c.who);if(bd){const b=document.createElement('span');b.className='bdg';b.textContent='★ '+bd;n.append(b);}n.append(': ');d.append(n,document.createTextNode(c.text));}box.append(d);}
   box.scrollTop=box.scrollHeight;}
 function sendChat(v){const t=cleanText(v);if(!t||!net.connected)return false;const now=performance.now();if(now-(net.chatAt||0)<350)return false;net.chatAt=now;
   if(net.mode==='host')netSend({e:'chat',from:store.name,text:t});else netSend({e:'chat',text:t});addChat(store.name,t,'me');return true;}
@@ -2775,9 +2812,10 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
+liveCfg();setInterval(liveCfg,300000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
-  if(!MP_OK){coopStatus(MP_NO,true);return;}if(!await ensureFresh())return;
+  if(!MP_OK){coopStatus(MP_NO,true);return;}await liveCfg();if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}if(!await ensureFresh())return;
   if(net.mode!=='off')return;Object.assign(net,{mode:'host',code:genCode(),connected:false,conn:null,chat:[],peers:new Map(),lobbyKey:''});hangarMode='mp';useProfile();net.remote={tank:null,name:'',st:0,fr:1};if(state==='hangar')renderHangar();coopUI();coopStatus('Opening a room…');
   try{await Transport.host(net.code,conn=>{
       if(net.locked){conn.on('open',()=>{rawSend(conn,JSON.stringify({e:'locked'}));setTimeout(()=>{try{conn.close();}catch(e){}},400);});return;}
@@ -2798,7 +2836,7 @@ function hostData(pe,d){
   if(d.e==='ping'){sendTo(pe,{e:'pong',t:num(d.t,0,1e15)});return;}
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)pe.rtt=pe.rtt?pe.rtt*.6+r*.4:r;return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
-    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;pe.tank=T&&(!T.admin||pe.perkAll)?d.tank:'m4a1';const n=cleanName(d.name);pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
+    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;pe.tank=T&&(!T.admin||pe.perkAll)?d.tank:'m4a1';const n=cleanName(d.name);pe.name=n||pe.name||'Guest '+pe.pid.slice(1);pe.bt=cleanBt(d.bt);checkBadges([pe.bt]);
     if(first){pe.rp=0;pe.mine=new Set(net.left&&net.left[pe.name.toLowerCase()]||[]);sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');sfx.ping();}
     net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o,mn:!!d.mn};return;}
@@ -2844,7 +2882,7 @@ function sendSnapshot(){
 }
 /* ---- guest ---- */
 async function joinCoop(code){
-  if(!MP_OK){coopStatus(MP_NO,true);return;}if(!await ensureFresh())return;
+  if(!MP_OK){coopStatus(MP_NO,true);return;}await liveCfg();if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}if(!await ensureFresh())return;
   code=(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==6){coopStatus('Room codes have 6 characters.',true);return;}
   if(net.mode!=='off')return;store.lastCode=code;persist();Object.assign(net,{mode:'guest',code,connected:false,conn:null,chat:[],squad:[],meIdx:-1,names:{}});net.remote={tank:null,name:'',st:0,fr:1};hangarMode='mp';useProfile();if(state==='hangar')renderHangar();coopUI();coopStatus('Looking for room '+code+'…');
   try{const conn=await Transport.join(code,netError);attach(conn);
@@ -2852,7 +2890,7 @@ async function joinCoop(code){
   catch(err){netError(err);}
 }
 function attach(conn){net.conn=conn;
-  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
+  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name,bt:store.badge});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
   conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
   if(net.hostBenched){net.hostBenched=false;state='hangar';}
@@ -2884,7 +2922,7 @@ function guestData(d){
   if(d.e==='lobby'&&d.pf&&typeof d.pf==='object'){const f=d.pf,r=net.room||(net.room=freshSave());r.rp=Math.round(num(f.rp,0,1e9));r.best=Math.round(num(f.best,0,1e4));r.checkpoint=Math.round(num(f.cp,0,1e4));
     if(Array.isArray(f.owned)){r.owned=[...new Set(f.owned.slice(0,400).filter(id=>tget(id)&&!TYPE[id].admin).concat(STARTERS))];r.earned=r.owned.slice();}if(!owned(r.sel))r.sel='m4a1';
     if(state==='hangar'){useProfile();renderHangar();}if(pickOpen)renderPick();}
-  if(d.e==='lobby'){const sq=Array.isArray(d.sq)?d.sq.slice(0,MAX_PLAYERS):[];net.squad=sq.filter(Array.isArray).map(r=>[cleanName(r[0])||'Player',tget(r[1])?r[1]:null,r[2]?1:0,r[3]?1:0]);
+  if(d.e==='lobby'){const sq=Array.isArray(d.sq)?d.sq.slice(0,MAX_PLAYERS):[];net.squad=sq.filter(Array.isArray).map(r=>[cleanName(r[0])||'Player',tget(r[1])?r[1]:null,r[2]?1:0,r[3]?1:0,cleanBt(r[4])]);checkBadges(net.squad.map(r=>r[4]));
     net.meIdx=Math.round(num(d.me,-1,MAX_PLAYERS));const h=net.squad[0];if(h){net.remote.name=h[0];net.remote.tank=h[1];}net.remote.st=d.st?1:0;net.remote.fr=d.fr?1:0;coopUI();return;}
   if(d.e==='chat'){const t=cleanText(d.text);if(!t)return;addChat(cleanName(d.from)||'Player',t,'them');sfx.ping();return;}
   if(d.e==='sys'){const t=cleanText(d.text);if(t)addChat(null,t,'sys');return;}
