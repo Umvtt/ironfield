@@ -28,6 +28,10 @@ Ironfield is a top-down, War Thunder-style browser game, built as one self-conta
 - **What's new:** the publish workflow writes `version.json` with `notes` (commit title), `details` (the commit body's bullet list) and `build`; the hangar's "What's new" box shows it, expanded once per new version. So write commit bodies as short player-facing `- ` bullets.
 - **Rules:** co-op has no nuke and no admin unlocks (except through badge abilities). The host can also sit out between waves (`hostBench`/`hostRejoin`): the battle keeps running on the host's device with the hangar shown over it. Guests can only leave during the break between waves (`benchMe` → host confirms with `benched`); they can rejoin any time from the hangar ("Join the battle" → `hello` → `hotJoin`, keeping their battle stats). Wave RP only goes to players on the field (`humans()`) when the wave is cleared. French vehicles explode randomly when the host's setting is on (on by default).
 
+## Pending polish (owner asked; do when they have usage)
+- Rewrite player-facing texts across the game so they read less AI-like (hangar, rules, hints, toasts, What's new style); no mechanic changes.
+- Full polish pass on the news/maintenance flow and the admin panel.
+
 ## Working on it
 - After edits, check the script parses: extract the `<script>` block and run `node --check` on it.
 - Test in a headless browser (Playwright) on desktop and on a phone viewport (390×844 and 844×390), and check for page errors.

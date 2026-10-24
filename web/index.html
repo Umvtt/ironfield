@@ -113,7 +113,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
 .report b{font-family:var(--mono);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--khaki)}
 .report b.rp{color:var(--signal)}
 .note{font-size:15px;color:var(--dim);margin:0;max-width:62ch;line-height:1.4}
-#liveNote{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9;width:max-content;max-width:min(560px,calc(100vw - 32px));background:rgba(16,19,13,.94);border:1px solid var(--signal);border-left-width:3px;color:var(--khaki);padding:8px 12px;font-size:15px;line-height:1.35;border-radius:3px;pointer-events:none;overflow-wrap:anywhere}
+#liveNote{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;width:max-content;max-width:min(560px,calc(100vw - 32px));background:rgba(16,19,13,.94);border:1px solid var(--signal);border-left-width:3px;color:var(--khaki);padding:8px 12px;font-size:15px;line-height:1.35;border-radius:3px;pointer-events:none;overflow-wrap:anywhere}
 #liveNote b{color:var(--signal)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:9;background:var(--signal);color:var(--ink);font-family:var(--mono);font-size:13px;font-weight:600;padding:9px 14px;border-radius:2px;max-width:calc(100% - 32px)}
 #safe{position:fixed;inset:0;pointer-events:none;visibility:hidden;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
@@ -2071,8 +2071,11 @@ function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LI
     if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
     if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
     if(notes.length)liveNote(notes);}
+  if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&(net.mode!=='off'||state!=='hangar'))maintKick();
   liveSeen=true;
   if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild)needUpdate();}
+function maintKick(){const msg=LIVE.maint.text||'Ironfield is down for maintenance. We\'ll be back soon.';
+  try{if(net.mode!=='off')leaveCoop();if(state!=='hangar')toHangar();}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
 async function needUpdate(){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
   let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
   if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}
@@ -2166,7 +2169,7 @@ function renderHangar(){
   $('#rpTag').textContent=net.mode==='guest'?'Your room research points':net.mode==='host'?'Research points · your slot '+(store.active+1):'Research points · slot '+(store.active+1);
   $('#modeSolo').setAttribute('aria-selected',String(!coop));$('#modeMp').setAttribute('aria-selected',String(coop));$('#modeSolo').setAttribute('aria-disabled',String(net.mode!=='off'));
   $('#soloPanel').hidden=coop;$('#mpPanel').hidden=!coop;if(!coop)renderSlots();
-  $('#adminBtn').hidden=coop&&!myAb().has('admin');{const bd=badgeFor(store.name),el=$('#myBadge'),A={nuke:'nukes in co-op',admin:'every vehicle',kick:'can\'t be kicked',vote:'starts waves alone'};el.hidden=!bd;if(bd)el.textContent='★ '+bd+' badge'+(myAb().size?' · '+[...myAb()].map(x=>A[x]).join(', '):'');}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
+  $('#adminBtn').hidden=coop&&!myAb().has('admin');{const bd=badgeFor(store.name),el=$('#myBadge'),A={nuke:'nukes in co-op',admin:'every vehicle',kick:'can\'t be kicked',vote:'starts waves alone'};el.hidden=!bd;if(bd){el.textContent='★ '+bd;el.title=myAb().size?[...myAb()].map(x=>A[x]).join(' · '):'';}}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
   if(net.mode==='host'&&net.connected)sendLobby();
   $('#tabs').innerHTML=NATIONS.map(n=>'<button class="tab" type="button" role="tab" id="tab-'+n.id+'" data-n="'+n.id+'" aria-selected="'+(n.id===save.nation)+'">'+flagImg(n.id)+n.name+'</button>').join('');
   if(TYPE[viewId]&&(TYPE[viewId].air?'air':'ground')!==treeDom)treeDom=TYPE[viewId].air?'air':'ground';
