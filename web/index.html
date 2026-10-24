@@ -2861,7 +2861,7 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
-liveCfg().then(liveConnect);setInterval(liveCfg,300000);checkBadges([store.badge]);
+liveCfg().then(liveConnect);setInterval(()=>{if(!document.hidden)liveCfg();},10000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   if(!MP_OK){coopStatus(MP_NO,true);return;}await liveCfg();if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}if(!await ensureFresh())return;
