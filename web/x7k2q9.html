@@ -41,6 +41,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
 .item .d{color:var(--dim);font-size:14px}
 .item .sp{flex:1}
 .st-ready{color:var(--ok)}.st-done,.st-exp{color:var(--dim)}.st-off{color:var(--bad)}
+.abs{display:flex;flex-direction:column;gap:6px}.chip{font-size:12px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--text)}
 .meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .2s}
 [hidden]{display:none!important}
 </style>
@@ -62,6 +63,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
   <div class="msg" id="lMsg"></div>
 </section>
 <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
+  <section class="card" id="ed" hidden><h2 id="edH">Edit</h2><div class="grid"><label>Callsign <input id="edName" maxlength="16"></label><label>Badge text <input id="edLabel" maxlength="16"></label></div><p>Abilities</p><div class="abs" data-ab><label class="chk"><input type="checkbox" value="nuke"> Nukes in co-op</label><label class="chk"><input type="checkbox" value="admin"> Every vehicle (admin), every session &middot; no RP from them in rooms</label><label class="chk"><input type="checkbox" value="kick"> Can't be kicked</label><label class="chk"><input type="checkbox" value="vote"> Starts the next wave alone</label></div><div class="row"><button id="edGo" type="button">Save</button><button class="ghost" id="edNo" type="button">Cancel</button></div><div class="msg" id="edMsg"></div></section>
   <div class="tabs" role="tablist">
     <button type="button" data-tab="live" aria-selected="true">News &amp; settings</button>
     <button type="button" data-tab="codes" aria-selected="false">Codes</button>
@@ -95,10 +97,12 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
       <label id="kRpL" hidden>RP amount <input id="kRp" type="number" min="1" max="1000000" value="5000"></label>
       <label id="kVehL" hidden>Vehicle <select id="kVeh"><option value="">Loading…</option></select></label>
       <label id="kBadgeL" hidden>Badge text <input id="kBadge" maxlength="16" value="Creator"></label>
+      <label id="kCsL" hidden>Callsign (locked to the badge) <input id="kCs" maxlength="16"></label>
       <label>How many people can use it <input id="kUses" type="number" min="1" max="10000" value="1"></label>
       <label>Expires (empty = never) <input id="kExp" type="datetime-local"></label>
       <label>Note for you (who it's for) <input id="kNote" maxlength="60"></label>
     </div>
+    <div id="kAbL" hidden><p>Abilities</p><div class="abs" data-ab><label class="chk"><input type="checkbox" value="nuke"> Nukes in co-op</label><label class="chk"><input type="checkbox" value="admin"> Every vehicle (admin), every session &middot; no RP from them in rooms</label><label class="chk"><input type="checkbox" value="kick"> Can't be kicked</label><label class="chk"><input type="checkbox" value="vote"> Starts the next wave alone</label></div></div>
     <div class="row"><button id="kGo" type="button">Make the code</button></div>
     <div class="row"><span class="code" id="kCode">—</span><button class="ghost small" id="kCopy" type="button" hidden>Copy</button></div>
     <div class="msg" id="kMsg"></div>
@@ -115,7 +119,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
   </section>
   <section class="card" data-pane="badges" hidden>
     <div class="row" style="justify-content:space-between"><h2>Badges given out</h2><button class="ghost small" id="bRefresh" type="button">Refresh</button></div>
-    <p>A badge shows only next to its callsign, and nobody else can use that callsign. Change name moves it; Take back frees it.</p>
+    <p>A badge shows only next to its callsign, and nobody else can use that callsign. Edit changes the callsign, text or abilities, even while it is in use; Take back removes it.</p>
     <div class="list" id="bList"></div>
     <div class="msg" id="bMsg"></div>
   </section>
@@ -217,13 +221,22 @@ fetch('index.html',{cache:'no-store'}).then(r=>r.text()).then(src=>{const re=/\b
   const N={usa:'USA',ger:'Germany',ussr:'USSR',uk:'Britain',fra:'France'},sel=$('#kVeh');sel.textContent='';
   for(const nat of Object.keys(N)){const g=document.createElement('optgroup');g.label=N[nat];for(const v of list.filter(v=>v.nat===nat).sort((a,b)=>a.tier-b.tier||a.name.localeCompare(b.name))){VEH[v.id]=v.name;const o=document.createElement('option');o.value=v.id;o.textContent='Tier '+v.tier+' · '+v.name+' ('+v.cls+')';g.append(o);}sel.append(g);}})
   .catch(()=>{$('#kVeh').innerHTML='<option value="">Could not load the vehicle list</option>';});
-const kindUI=()=>{const k=$('#kKind').value;$('#kRpL').hidden=k!=='rp';$('#kVehL').hidden=k!=='veh';$('#kBadgeL').hidden=k!=='badge';if(k==='badge'&&+$('#kUses').value>1)$('#kUses').value=1;};
+const kindUI=()=>{const k=$('#kKind').value;$('#kRpL').hidden=k!=='rp';$('#kVehL').hidden=k!=='veh';$('#kBadgeL').hidden=k!=='badge';$('#kCsL').hidden=k!=='badge';$('#kAbL').hidden=k!=='badge';if(k==='badge'&&+$('#kUses').value>1)$('#kUses').value=1;};
 $('#kKind').onchange=kindUI;kindUI();
-const gives=r=>r.k==='all'?'Every vehicle (session)':r.k==='rp'?(+r.v).toLocaleString()+' RP':r.k==='veh'?(VEH[r.v]||r.v):r.k==='badge'?'Badge: '+r.v:r.k;
+const AB={nuke:'Nukes',admin:'Every vehicle',kick:'No kick',vote:'Starts waves'};
+const abGet=sel=>[...document.querySelectorAll(sel+' [data-ab] input:checked')].map(i=>i.value);
+const abSet=(sel,a)=>{for(const i of document.querySelectorAll(sel+' [data-ab] input'))i.checked=(a||[]).includes(i.value);};
+const chips=(it,a)=>{for(const x of a||[]){const c=document.createElement('span');c.className='chip';c.textContent=AB[x]||x;it.append(c);}};
+let ED=null;
+function edit(kind,id,name,label,ab,done){ED={kind,id,done};$('#edH').textContent=kind==='code'?'Edit badge code':'Edit badge';$('#edName').value=name||'';$('#edLabel').value=label||'';abSet('#ed',ab);say('#edMsg','');$('#ed').hidden=false;$('#ed').scrollIntoView({behavior:'smooth'});}
+$('#edNo').onclick=()=>{$('#ed').hidden=true;ED=null;};
+$('#edGo').onclick=async()=>{if(!ED)return;const name=$('#edName').value.trim(),label=$('#edLabel').value.trim(),ab=abGet('#ed');if(!name||!label)return say('#edMsg','Callsign and badge text are needed.','bad');
+  try{if(ED.kind==='code')await admin('set',[ED.id],{cs:name,v:label,ab});else await admin('rebadge',[ED.id],{name,label,ab});const d=ED.done;$('#ed').hidden=true;ED=null;d&&d({name,label,ab});}catch(e){say('#edMsg',e.message,'bad');}};
+const gives=r=>r.k==='all'?'Every vehicle (session)':r.k==='rp'?(+r.v).toLocaleString()+' RP':r.k==='veh'?(VEH[r.v]||r.v):r.k==='badge'?'Badge: '+r.v+(r.cs?' for '+r.cs:''):r.k;
 $('#kGo').onclick=async()=>{const k=$('#kKind').value,d={k,uses:Math.max(1,Math.min(10000,Math.round(+$('#kUses').value||1))),exp:fromLocal($('#kExp').value),note:$('#kNote').value.trim()};
   if(k==='rp'){d.v=Math.round(+$('#kRp').value||0);if(d.v<1||d.v>1e6)return say('#kMsg','RP must be between 1 and 1,000,000.','bad');}
   if(k==='veh'){d.v=$('#kVeh').value;if(!d.v)return say('#kMsg','Pick a vehicle.','bad');}
-  if(k==='badge'){d.v=$('#kBadge').value.trim();if(!d.v)return say('#kMsg','Write the badge text.','bad');}
+  if(k==='badge'){d.v=$('#kBadge').value.trim();d.cs=$('#kCs').value.trim();d.ab=abGet('#kAbL');if(!d.v)return say('#kMsg','Write the badge text.','bad');if(!d.cs)return say('#kMsg','Write the callsign the badge locks.','bad');}
   if(d.exp&&d.exp<Date.now())return say('#kMsg','The expiry date is in the past.','bad');
   const r=crypto.getRandomValues(new Uint32Array(6));let id='';for(const v of r)id+=A[v%32];
   say('#kMsg','Making…');try{await admin('mk',[id],d);fresh(id,Object.assign({},d,{v:d.v??'',n:0,off:false,made:Date.now()}));const c=await codeOf(id);$('#kCode').textContent=fmtCode(c);$('#kCopy').hidden=false;
@@ -233,17 +246,18 @@ let CODES=[],allOn=true;
 const OVER=new Map(),fresh=(id,r,x)=>OVER.set(id,Object.assign({r,t:Date.now()},x));
 const stOf=r=>r.off?'off':r.n>=r.uses?'done':r.exp&&Date.now()>r.exp?'exp':'ready';
 const stTxt={ready:'ready',done:'used up',exp:'expired',off:'switched off'};
-async function loadCodes(){say('#cMsg','Loading…');try{const j=await admin('list'),m=new Map(j.codes);for(const[id,o]of OVER){if(Date.now()-o.t>90e3){OVER.delete(id);continue;}if(!o.r)m.delete(id);else if(!m.has(id))m.set(id,o.r);else if('off' in o)m.set(id,Object.assign({},m.get(id),{off:o.off}));}
+async function loadCodes(){say('#cMsg','Loading…');try{const j=await admin('list'),m=new Map(j.codes);for(const[id,o]of OVER){if(Date.now()-o.t>90e3){OVER.delete(id);continue;}if(!o.r)m.delete(id);else if(!m.has(id)||o.full)m.set(id,o.r);else if('off' in o)m.set(id,Object.assign({},m.get(id),{off:o.off}));}
     CODES=[...m].sort((a,b)=>(b[1].made||0)-(a[1].made||0));allOn=j.all;await renderCodes();say('#cMsg',CODES.length?'':'No codes yet.');}
   catch(e){say('#cMsg','Could not load: '+e.message,'bad');}}
 async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn').textContent='All codes: '+(allOn?'ON':'OFF');
   for(const[id,r]of CODES){const st=stOf(r),it=document.createElement('div');it.className='item';
     const sp=(t,c)=>{const e=document.createElement('span');e.textContent=t;if(c)e.className=c;it.append(e);return e;};
     const code=await codeOf(id);sp(fmtCode(code),'c');sp(gives(r),'k');sp(r.n+' / '+r.uses+' used','d');if(r.exp)sp('ends '+when(r.exp),'d');if(r.note)sp(r.note,'d');sp(stTxt[st],'st-'+st);
-    const gap=document.createElement('span');gap.className='sp';it.append(gap);
+    if(r.k==='badge')chips(it,r.ab);const gap=document.createElement('span');gap.className='sp';it.append(gap);
     const btn=(t,f,cls)=>{const b=document.createElement('button');b.type='button';b.className=(cls||'ghost')+' small';b.textContent=t;b.onclick=f;it.append(b);};
     btn('Copy',()=>navigator.clipboard.writeText(fmtCode(code)).then(()=>say('#cMsg','Copied '+fmtCode(code)+'.','ok'),()=>{}));
     if(st==='ready'||st==='off')btn(r.off?'Turn on':'Turn off',async()=>{try{await admin('set',[id],{off:!r.off});fresh(id,Object.assign({},r,{off:!r.off}),{off:!r.off});loadCodes();}catch(e){say('#cMsg',e.message,'bad');}});
+    if(r.k==='badge'&&r.n<r.uses)btn('Edit',()=>edit('code',id,r.cs,r.v,r.ab,x=>{fresh(id,Object.assign({},r,{cs:x.name,v:x.label,ab:x.ab}),{full:1});loadCodes().then(()=>say('#cMsg','Saved.','ok'));}));
     btn('Delete',async()=>{if(!confirm('Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);fresh(id,null);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
     box.append(it);}}
 $('#cRefresh').onclick=loadCodes;
@@ -256,11 +270,11 @@ async function loadLog(){say('#gMsg','Loading…');try{const L=(await admin('log
     for(const x of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[[when(x.t),'d'],[x.id,'c'],[String(x.p||'').replace(/^rp:(\d+)/,(m,n)=>(+n).toLocaleString()+' RP').replace(/^veh:(\w+)/,(m,v)=>VEH[v]||v).replace('all_vehicles','Every vehicle').replace('badge','Badge'),'k'],[x.name||'(no name)','d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}box.append(it);}
     say('#gMsg',L.length?'':'Nobody has redeemed a code yet.');}catch(e){say('#gMsg','Could not load: '+e.message,'bad');}}
 $('#gRefresh').onclick=loadLog;
-const GONE=new Map();
-async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.filter(([id])=>!(Date.now()-(GONE.get(id)||0)<90e3)).sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
+const GONE=new Map(),EDB=new Map();
+async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.filter(([id])=>!(Date.now()-(GONE.get(id)||0)<90e3)).map(([id,b])=>{const e=EDB.get(id);return[id,e&&Date.now()-e.t<90e3?e.b:b];}).sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
     for(const[id,b]of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[['★ '+b.label,'k'],[b.name||'(no name)','c'],[when(b.made),'d'],['code '+b.code,'d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}
       const gap=document.createElement('span');gap.className='sp';it.append(gap);const x=document.createElement('button');x.type='button';x.className='danger small';x.textContent='Take back';
-      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Change name';rn.onclick=async()=>{const nn=(prompt('New callsign for this badge (max 16 characters):',b.name||'')||'').trim().slice(0,16);if(!nn||nn===b.name)return;try{await admin('rebadge',[id],{name:nn});b.name=nn;say('#bMsg','Name changed to '+nn+'.','ok');loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};it.append(rn,x);box.append(it);}
+      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};chips(it,b.ab);const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Edit';rn.onclick=()=>edit('badge',id,b.name,b.label,b.ab,x=>{EDB.set(id,{t:Date.now(),b:Object.assign({},b,{name:x.name,label:x.label,ab:x.ab})});loadBadges();say('#bMsg','Saved: the change reaches their game right away.','ok');});it.append(rn,x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
 $('#bRefresh').onclick=loadBadges;
 show(load().ct?'#lock':'#setup');
