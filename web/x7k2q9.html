@@ -278,6 +278,7 @@ async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('
       x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};chips(it,b.ab);const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Edit';rn.onclick=()=>edit('badge',id,b.name,b.label,b.ab,x=>{EDB.set(id,{t:Date.now(),b:Object.assign({},b,{name:x.name,label:x.label,ab:x.ab})});loadBadges();say('#bMsg','Saved: the change reaches their game right away.','ok');});it.append(rn,x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
 $('#bRefresh').onclick=loadBadges;
+setInterval(()=>{if(!KEY||document.hidden||!$('#ed').hidden)return;const t=(document.querySelector('.tabs button[aria-selected=true]')||{}).dataset;({codes:loadCodes,log:loadLog,badges:loadBadges})[t&&t.tab]?.();},30000);
 show(load().ct?'#lock':'#setup');
 </script>
 </body>
