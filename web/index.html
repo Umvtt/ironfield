@@ -2071,11 +2071,11 @@ function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LI
     if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
     if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
     if(notes.length)liveNote(notes);}
-  if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&net.mode!=='off')maintKick();
+  if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&(net.mode!=='off'||state!=='hangar'))maintKick();
   liveSeen=true;
   if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild)needUpdate();}
 function maintKick(){const msg=LIVE.maint.text||'Ironfield is down for maintenance. We\'ll be back soon.';
-  try{if(net.mode!=='off'){leaveCoop();if(state!=='hangar')toHangar();}}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
+  try{if(net.mode!=='off')leaveCoop();if(state!=='hangar')toHangar();}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
 async function needUpdate(){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
   let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
   if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}
@@ -2851,8 +2851,9 @@ function sysAll(text){addChat(null,text,'sys');if(net.mode==='host')netSend({e:'
 /* ---- host ---- */
 function newPeer(conn){return{pid:'p'+(pidSeq++),conn,open:false,name:'',tank:null,t:null,stats:null,input:null,inputAt:0,lastClicks:undefined,lastPicks:undefined,acts:[],chatIn:[],events:[],rtt:0,lastRx:performance.now(),pingAt:0,deathCause:''};}
 /* multiplayer only runs on the official website (localhost is allowed for testing); downloaded copies play solo */
-const MP_OK=['umvtt.github.io','localhost','127.0.0.1'].includes(location.hostname)&&location.protocol!=='file:';
-const MP_NO='Multiplayer only works on the website: umvtt.github.io/ironfield. This copy can play solo.';
+const MP_LOCK=true;/* owner's emergency lock: set to false to open multiplayer again */
+const MP_OK=!MP_LOCK&&['umvtt.github.io','localhost','127.0.0.1'].includes(location.hostname)&&location.protocol!=='file:';
+const MP_NO=MP_LOCK?'Multiplayer is closed for now. We\'ll be back soon.':'Multiplayer only works on the website: umvtt.github.io/ironfield. This copy can play solo.';
 const MY_BUILD=(document.querySelector('meta[name="ironfield-version"]')||{}).content||'';
 async function latestBuild(){try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});const v=r.ok?await r.json():null;return v&&v.build?String(v.build).replace(/[^0-9]/g,''):'';}catch(e){return '';}}
 /* reload onto the newest version (the ?v= keeps the browser from serving its cached copy) */
