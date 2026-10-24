@@ -2093,10 +2093,19 @@ function trTree(root){tring=true;const w=document.createTreeWalker(root,NodeFilt
 function setLang(l){lang=l==='tr'?'tr':'en';try{localStorage.setItem('ironfield-lang',lang);}catch(e){}document.documentElement.lang=lang;$('#langSel').value=lang;trTree(document.body);}
 new MutationObserver(ms=>{if(tring)return;tring=true;for(const m of ms){if(m.type==='characterData'){const t=m.target;if(orig.has(t)&&(TR[orig.get(t)]===t.nodeValue.trim()||orig.get(t)===t.nodeValue.trim()))continue;orig.delete(t);trNode(t);}else for(const a of m.addedNodes){if(a.nodeType===3){trNode(a);}else if(a.nodeType===1){tring=false;trTree(a);tring=true;}}}tring=false;}).observe(document.body,{childList:true,subtree:true,characterData:true});
 $('#langSel').addEventListener('change',e=>setLang(e.target.value));setLang(lang);
-let codeApi=null;
-async function codeAPI(){if(codeApi!==null)return codeApi;try{const r=await fetch('codes.json?t='+Date.now(),{cache:'no-store'});const c=r.ok?await r.json():null;codeApi=c&&typeof c.api==='string'&&/^https:\/\/[a-z0-9.-]+(\/[a-z0-9._-]*)?$/i.test(c.api)?c.api.replace(/\/$/,''):'';}catch(e){codeApi='';}return codeApi;}
-async function codeCall(path,body){const api=await codeAPI();if(!api)return{ok:false,reason:'setup'};
-  for(let i=0;i<4;i++){try{const r=await fetch(api+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});return await r.json();}catch(e){if(i<3)await new Promise(f=>setTimeout(f,[400,1200,2500][i]));}}
+/* the server has two addresses (codes.json: api + alt); if one can't be reached the game switches to the other and
+   remembers the one that worked */
+let codeApis=null,apiIdx=0;try{apiIdx=+localStorage.getItem('ironfield-api')||0;}catch(e){}
+const okUrl=u=>typeof u==='string'&&/^https:\/\/[a-z0-9.-]+(\/[a-z0-9._-]*)?$/i.test(u);
+async function codeAPIs(){if(codeApis)return codeApis;try{const r=await fetch('codes.json?t='+Date.now(),{cache:'no-store'});const c=r.ok?await r.json():null;
+    codeApis=c?[c.api].concat(Array.isArray(c.alt)?c.alt.slice(0,3):[]).filter(okUrl).map(u=>u.replace(/\/$/,'')):[];}catch(e){return[];}
+  if(apiIdx>=codeApis.length)apiIdx=0;return codeApis;}
+async function codeAPI(){const L=await codeAPIs();return L[apiIdx]||'';}
+function apiWorked(i){if(i===apiIdx)return;apiIdx=i;try{localStorage.setItem('ironfield-api',String(i));}catch(e){}}
+function apiNext(){const n=(codeApis||[]).length;if(n>1)apiWorked((apiIdx+1)%n);}
+async function codeCall(path,body){const L=await codeAPIs();if(!L.length)return{ok:false,reason:'setup'};
+  for(let i=0;i<4;i++){const k=(apiIdx+i)%L.length;try{const r=await fetch(L[k]+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();apiWorked(k);return j;}
+    catch(e){if(i<3)await new Promise(f=>setTimeout(f,[300,900,2000][i]));}}
   return{ok:false,reason:'net'};}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
 async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
@@ -2115,7 +2124,7 @@ async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase()
 let LIVE={news:{on:false,text:''},rp:{mul:1,until:0},maint:{on:false,text:''},minBuild:0,names:new Set(),bv:0};
 const liveTxt=(v,n)=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,' ').slice(0,n);
 function rpMul(){const r=LIVE.rp;return r.mul>1&&(!r.until||Date.now()<r.until)?r.mul:1;}
-async function liveCfg(){const api=await codeAPI();if(!api)return;try{const r=await fetch(api+'/config',{cache:'no-store'});const c=r.ok?await r.json():null;if(c&&typeof c==='object')applyLive(c);}catch(e){}}
+async function liveCfg(){const L=await codeAPIs();for(let i=0;i<L.length;i++){const k=(apiIdx+i)%L.length;try{const r=await fetch(L[k]+'/config',{cache:'no-store'});const c=r.ok?await r.json():null;if(c&&typeof c==='object'){apiWorked(k);applyLive(c);return;}}catch(e){}}}
 /* settings arrive here from the 5-minute check or, instantly, from the server's live connection; changes after the
    first load are also announced over the battle */
 let liveSeen=false;
@@ -2147,9 +2156,9 @@ function liveNote(rows){const el=$('#liveNote');if(!el)return;el.textContent='';
 let liveWs=null,liveTry=0,livePing=0;
 async function liveConnect(){const api=await codeAPI();if(!api||!('WebSocket' in window)||(liveWs&&liveWs.readyState<2))return;
   let ws;try{ws=new WebSocket(api.replace(/^https:/,'wss:')+'/live');}catch(e){liveRetry();return;}liveWs=ws;
-  ws.onopen=()=>{liveTry=0;clearInterval(livePing);livePing=setInterval(()=>{try{ws.send('ping');}catch(e){}},45000);};
+  ws.onopen=()=>{liveTry=0;ws.opened=1;clearInterval(livePing);livePing=setInterval(()=>{try{ws.send('ping');}catch(e){}},45000);};
   ws.onmessage=e=>{if(typeof e.data!=='string'||e.data.length>6000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(d&&d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);};
-  ws.onclose=()=>{clearInterval(livePing);if(liveWs===ws)liveWs=null;liveRetry();};}
+  ws.onclose=()=>{clearInterval(livePing);if(liveWs===ws)liveWs=null;if(!ws.opened)apiNext();liveRetry();};}
 function liveRetry(){liveTry++;setTimeout(()=>{if(!document.hidden)liveConnect();},Math.min(60000,2000*2**Math.min(liveTry,5))+Math.random()*2000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!liveWs)liveConnect();});
 function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';const add=(t,c)=>{const p=document.createElement('p');p.textContent=t;if(c)p.className=c;el.append(p);};
@@ -2822,7 +2831,11 @@ function hud(){
    game traffic then flows browser to browser over WebRTC. Everything that arrives is parsed and clamped before use. */
 const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=5;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
-function loadPeer(){return new Promise((res,rej)=>{if(window.Peer)return res(window.Peer);const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';sc.onload=()=>window.Peer?res(window.Peer):rej(new Error('load failed'));sc.onerror=()=>rej(new Error('load failed'));document.head.appendChild(sc);});}
+/* the PeerJS library comes from one of three CDNs, whichever loads first in turn */
+const PEER_SRC=['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js','https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js'];
+function loadPeer(){return new Promise((res,rej)=>{if(window.Peer)return res(window.Peer);let i=0;
+  const next=()=>{if(i>=PEER_SRC.length)return rej(new Error('load failed'));const sc=document.createElement('script');sc.src=PEER_SRC[i++];const to=setTimeout(()=>{sc.onload=sc.onerror=null;sc.remove();next();},8000);
+    sc.onload=()=>{clearTimeout(to);window.Peer?res(window.Peer):next();};sc.onerror=()=>{clearTimeout(to);sc.remove();next();};document.head.appendChild(sc);};next();});}
 let Transport={
   host:(code,onConn,onErr)=>loadPeer().then(P=>new Promise((res,rej)=>{let done=false;const p=new P(NET_PREFIX+code,PEER_OPTS);net.peer=p;
     p.on('open',()=>{done=true;res();});p.on('connection',c=>onConn(c));p.on('error',e=>{if(!done){done=true;rej(e);}else onErr(e);});
