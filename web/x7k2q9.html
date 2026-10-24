@@ -6,9 +6,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://*.workers.dev; img-src data:; base-uri 'none'; form-action 'none'">
-<title>Ironfield Admin</title>
-<!-- Ironfield admin panel. This page holds no secrets: the server key is stored only in the owner's browser,
-     encrypted with their password (PBKDF2-SHA256, 600,000 rounds, AES-256-GCM). Without the password it can do nothing. -->
+<title>Sign in</title>
 <style>
 :root{--bg:#10130d;--panel:#1b2015;--panel2:#232a1b;--line:#3a4229;--text:#d8cfa2;--dim:#8e8a6b;--accent:#f2a23a;--ok:#8bd66e;--bad:#ee5d50}
 *{box-sizing:border-box}
@@ -49,29 +47,20 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
 </head>
 <body>
 <main>
-<h1>Ironfield admin</h1>
-
 <section class="card" id="setup" hidden>
-  <h2>First-time setup on this device</h2>
-  <p>Your server key is stored only in this browser, locked with your password. Nothing secret is ever put on GitHub.</p>
-  <label>Server address <input id="sUrl" autocomplete="off" spellcheck="false" placeholder="https://ironfield-codes.yourname.workers.dev"></label>
-  <label>Secret key (the same one as in Cloudflare) <input id="sKey" type="password" autocomplete="off"></label>
-  <label>Choose a password <input id="sPw" type="password" autocomplete="new-password"></label>
+  <label>Address <input id="sUrl" autocomplete="off" spellcheck="false"></label>
+  <label>Key <input id="sKey" type="password" autocomplete="off"></label>
+  <label>Password <input id="sPw" type="password" autocomplete="new-password"></label>
   <div class="meter"><i id="sMeter"></i></div>
-  <p id="sRule">At least 12 characters with 3 of: lowercase, uppercase, numbers, symbols. Or a passphrase of 20+ characters.</p>
-  <label>Type it again <input id="sPw2" type="password" autocomplete="new-password"></label>
-  <div class="row"><button id="sGo" type="button">Check the key and save</button></div>
+  <label>Repeat <input id="sPw2" type="password" autocomplete="new-password"></label>
+  <div class="row"><button id="sGo" type="button">Save</button></div>
   <div class="msg" id="sMsg"></div>
 </section>
-
 <section class="card" id="lock" hidden>
-  <h2>Locked</h2>
   <label>Password <input id="lPw" type="password" autocomplete="current-password"></label>
-  <div class="row"><button id="lGo" type="button">Unlock</button></div>
+  <div class="row"><button id="lGo" type="button">Sign in</button><button class="ghost small" id="lReset" type="button">Reset</button></div>
   <div class="msg" id="lMsg"></div>
-  <div class="row"><button class="ghost small" id="lReset" type="button">Forgot it: set up this device again</button></div>
 </section>
-
 <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
   <div class="tabs" role="tablist">
     <button type="button" data-tab="live" aria-selected="true">News &amp; settings</button>
@@ -80,7 +69,6 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <button type="button" data-tab="badges" aria-selected="false">Badges</button>
     <button type="button" data-tab="acct" aria-selected="false">Security</button>
   </div>
-
   <section class="card" data-pane="live">
     <h2>News in the hangar</h2>
     <label class="chk"><input type="checkbox" id="nOn"> Show the news</label>
@@ -100,7 +88,6 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <div class="row"><button id="cfgSave" type="button">Save and go live</button><button class="ghost small" id="cfgLoad" type="button">Reload</button></div>
     <div class="msg" id="cfgMsg"></div>
   </section>
-
   <section class="card" data-pane="codes" hidden>
     <h2>Make a code</h2>
     <div class="grid">
@@ -121,20 +108,17 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <div class="row"><button class="ghost small" id="cDelDone" type="button">Delete used-up codes</button><button class="ghost small" id="cDelExp" type="button">Delete expired codes</button></div>
     <div class="msg" id="cMsg"></div>
   </section>
-
   <section class="card" data-pane="log" hidden>
     <div class="row" style="justify-content:space-between"><h2>Last 200 redemptions</h2><button class="ghost small" id="gRefresh" type="button">Refresh</button></div>
     <div class="list" id="gList"></div>
     <div class="msg" id="gMsg"></div>
   </section>
-
   <section class="card" data-pane="badges" hidden>
     <div class="row" style="justify-content:space-between"><h2>Badges given out</h2><button class="ghost small" id="bRefresh" type="button">Refresh</button></div>
     <p>A badge shows only next to the callsign it was redeemed with. Take one back and it disappears from that player's name.</p>
     <div class="list" id="bList"></div>
     <div class="msg" id="bMsg"></div>
   </section>
-
   <section class="card" data-pane="acct" hidden>
     <h2>Change password</h2>
     <label>Current password <input id="aOld" type="password" autocomplete="current-password"></label>
@@ -154,12 +138,11 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
 if(window.top!==window.self){document.documentElement.textContent='';throw new Error('framed');}
 const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',enc=new TextEncoder(),dec=new TextDecoder(),$=s=>document.querySelector(s);
 const STORE='ironfield-admin',ROUNDS=600000,IDLE=10*60e3,AWAY=2*60e3;
-let KEY=null,URL0='';/* KEY: the server key as a non-extractable HMAC key (the text itself is never kept in memory) */
+let KEY=null,URL0='';
 const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const load=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}');}catch(e){return{};}};
 const keep=o=>localStorage.setItem(STORE,JSON.stringify(o));
 const say=(sel,t,cls)=>{const e=$(sel);e.textContent=t;e.className='msg'+(cls?' '+cls:'');};
-/* ---- password: strength, slow key stretching, encryption ---- */
 const COMMON=['password','passw0rd','123456','qwerty','letmein','iloveyou','admin','welcome','ironfield','monkey','dragon','football','sifre','şifre','galatasaray','fenerbahce','besiktas','trabzonspor'];
 function strength(pw){if(!pw)return 0;const cls=[/[a-z]/,/[A-Z]/,/[0-9]/,/[^A-Za-z0-9]/].filter(r=>r.test(pw)).length,lo=pw.toLowerCase();
   if(COMMON.some(w=>lo.includes(w))||/^(.)\1+$/.test(pw)||/(0123|1234|2345|3456|4567|5678|6789|abcd|qwer|asdf)/i.test(pw))return Math.min(1,pw.length/40);
@@ -178,37 +161,33 @@ const hex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
 function b32(bytes,n){let bits=0,val=0,out='';for(const b of bytes){val=((val<<8)|b)&0xffff;bits+=8;while(bits>=5){out+=A[(val>>>(bits-5))&31];bits-=5;}if(out.length>=n)break;}return out.slice(0,n);}
 const fmtCode=c=>c.slice(0,5)+'-'+c.slice(5,10)+'-'+c.slice(10);
 const codeOf=async id=>id+'S'+b32(await sign('code:'+id+'S'),8);
-/* ---- talking to the server: every admin request is signed and can only be used once, within 5 minutes ---- */
 async function admin(action,ids=[],data,key,url){const ts=Date.now(),ds=data===undefined?null:JSON.stringify(data);
   const sig=hex(await sign('admin:'+ts+':'+action+':'+ids.join(',')+(ds!==null?':'+ds:''),key));
   const body={ts,action,ids,sig};if(ds!==null)body.data=ds;
   const r=await fetch((url||URL0).replace(/\/$/,'')+'/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
   const j=await r.json().catch(()=>({ok:false,reason:'reply'}));if(!j.ok)throw new Error(j.reason==='auth'?'the server refused the key':j.reason||'error');return j;}
-/* ---- screens ---- */
 function show(id){for(const s of['#setup','#lock','#app'])$(s).hidden=s!==id;if(id==='#lock')lockTimer();}
 function lock(){KEY=null;URL0='';for(const e of document.querySelectorAll('#app input,#app textarea'))if(e.type==='password')e.value='';$('#kCode').textContent='—';$('#kCopy').hidden=true;show('#lock');$('#lPw').focus();}
 function lockTimer(){const st=load(),left=Math.max(0,(st.until||0)-Date.now());$('#lGo').disabled=left>0;
-  if(left>0){say('#lMsg','Too many wrong passwords. Try again in '+Math.ceil(left/1000)+' s.','bad');setTimeout(lockTimer,1000);}else if($('#lMsg').textContent.startsWith('Too many'))say('#lMsg','');}
-$('#sUrl').value='';fetch('codes.json',{cache:'no-store'}).then(r=>r.json()).then(c=>{if(c&&c.api&&!$('#sUrl').value)$('#sUrl').value=c.api;}).catch(()=>{});
+  if(left>0){say('#lMsg','Try again later.','bad');setTimeout(lockTimer,1000);}else if($('#lMsg').textContent.startsWith('Try again'))say('#lMsg','');}
 meter('#sPw','#sMeter');meter('#aNew','#aMeter');
 $('#sGo').onclick=async()=>{const url=$('#sUrl').value.trim(),secret=$('#sKey').value,pw=$('#sPw').value;
-  if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev\/?$/i.test(url))return say('#sMsg','The server address should look like https://name.yourname.workers.dev','bad');
-  if(secret.length<16)return say('#sMsg','That secret key looks too short.','bad');
-  if(!strongEnough(pw))return say('#sMsg','Pick a stronger password: at least 12 characters with 3 of lowercase, uppercase, numbers and symbols, or a 20+ character passphrase. Avoid common words.','bad');
-  if(pw!==$('#sPw2').value)return say('#sMsg','The two passwords are different.','bad');
-  say('#sMsg','Checking the key with the server…');$('#sGo').disabled=true;
+  if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev\/?$/i.test(url))return say('#sMsg','Invalid address.','bad');
+  if(secret.length<16)return say('#sMsg','Invalid key.','bad');
+  if(!strongEnough(pw))return say('#sMsg','Password too weak: 12+ characters with 3 of lowercase, uppercase, numbers, symbols (or 20+ characters).','bad');
+  if(pw!==$('#sPw2').value)return say('#sMsg','Passwords differ.','bad');
+  say('#sMsg','…');$('#sGo').disabled=true;
   try{const k=await hmacKey(secret);await admin('cfgget',[],undefined,k,url);await seal(pw,{url,secret});const st=load();st.url=url;keep(st);
     $('#sKey').value='';$('#sPw').value='';$('#sPw2').value='';KEY=k;URL0=url;say('#sMsg','');show('#app');openTab('live');}
-  catch(e){say('#sMsg','Not saved: '+e.message+'.','bad');}finally{$('#sGo').disabled=false;}};
-$('#lGo').onclick=async()=>{const st=load();if((st.until||0)>Date.now())return lockTimer();const pw=$('#lPw').value;if(!pw)return;$('#lGo').disabled=true;say('#lMsg','Unlocking…');
+  catch(e){say('#sMsg','Invalid key.','bad');}finally{$('#sGo').disabled=false;}};
+$('#lGo').onclick=async()=>{const st=load();if((st.until||0)>Date.now())return lockTimer();const pw=$('#lPw').value;if(!pw)return;$('#lGo').disabled=true;say('#lMsg','…');
   try{const o=await unseal(pw);KEY=await hmacKey(o.secret);URL0=o.url;$('#lPw').value='';const s2=load();s2.fails=0;s2.until=0;keep(s2);say('#lMsg','');show('#app');openTab('live');poke();}
-  catch(e){const s2=load();s2.fails=(s2.fails||0)+1;if(s2.fails>=5)s2.until=Date.now()+Math.min(3600e3,30e3*2**(s2.fails-5));keep(s2);$('#lPw').value='';say('#lMsg','Wrong password.','bad');lockTimer();}
+  catch(e){const s2=load();s2.fails=(s2.fails||0)+1;if(s2.fails>=5)s2.until=Date.now()+Math.min(3600e3,30e3*2**(s2.fails-5));keep(s2);$('#lPw').value='';say('#lMsg','Incorrect.','bad');lockTimer();}
   finally{if(!((load().until||0)>Date.now()))$('#lGo').disabled=false;}};
 $('#lPw').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lGo').click();});
-$('#lReset').onclick=()=>{if(confirm('Remove the stored key from this device? You will need the secret key again to set it up. Codes and settings on the server are not touched.')){localStorage.removeItem(STORE);show('#setup');}};
+$('#lReset').onclick=()=>{if(confirm('Reset this device?')){localStorage.removeItem(STORE);show('#setup');}};
 $('#wipe').onclick=()=>{if(confirm('Remove the key from this device and lock? You will need the secret key to set it up again.')){localStorage.removeItem(STORE);KEY=null;URL0='';show('#setup');}};
 $('#lockNow').onclick=lock;
-/* auto-lock: 10 minutes idle, or 2 minutes after switching away */
 let lastUse=Date.now(),hiddenAt=0;const poke=()=>{lastUse=Date.now();};
 for(const ev of['pointerdown','keydown','input','wheel','touchstart'])addEventListener(ev,poke,{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else{if(KEY&&hiddenAt&&Date.now()-hiddenAt>AWAY)lock();hiddenAt=0;}});
@@ -217,14 +196,12 @@ $('#aGo').onclick=async()=>{const o=$('#aOld').value,n=$('#aNew').value;
   if(!strongEnough(n))return say('#aMsg','Pick a stronger new password.','bad');if(n!==$('#aNew2').value)return say('#aMsg','The two new passwords are different.','bad');
   say('#aMsg','Changing…');try{const obj=await unseal(o);await seal(n,obj);const st=load();st.url=obj.url;keep(st);for(const s of['#aOld','#aNew','#aNew2'])$(s).value='';say('#aMsg','Password changed.','ok');}
   catch(e){say('#aMsg','The current password is wrong.','bad');}};
-/* ---- tabs ---- */
 function openTab(t){for(const b of document.querySelectorAll('.tabs button'))b.setAttribute('aria-selected',String(b.dataset.tab===t));
   for(const p of document.querySelectorAll('[data-pane]'))p.hidden=p.dataset.pane!==t;({live:loadCfg,codes:loadCodes,log:loadLog,badges:loadBadges})[t]?.();}
 for(const b of document.querySelectorAll('.tabs button'))b.onclick=()=>openTab(b.dataset.tab);
 const toLocal=ms=>{if(!ms)return '';const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());};
 const fromLocal=v=>v?new Date(v).getTime()||0:0;
 const when=ms=>new Date(ms).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-/* ---- news & live settings ---- */
 async function loadCfg(){say('#cfgMsg','Loading…');try{const c=(await admin('cfgget')).cfg;$('#nOn').checked=c.news.on;$('#nText').value=c.news.text;$('#rMul').value=String(c.rp.mul);$('#rUntil').value=toLocal(c.rp.until);
     $('#mOn').checked=c.maint.on;$('#mText').value=c.maint.text;$('#minB').value=c.minBuild||'';say('#cfgMsg','');}catch(e){say('#cfgMsg','Could not load: '+e.message,'bad');}
   fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(v=>{$('#curB').textContent=v.build||'?';}).catch(()=>{$('#curB').textContent='?';});}
@@ -234,7 +211,6 @@ $('#cfgSave').onclick=async()=>{const cfg={news:{on:$('#nOn').checked,text:$('#n
   const cur=+$('#curB').textContent||0;if(cfg.minBuild&&cur&&cfg.minBuild>cur)return say('#cfgMsg','The oldest build allowed can\'t be newer than the newest build ('+cur+').','bad');
   if(cfg.maint.on&&!confirm('Turn on maintenance? Nobody will be able to host or join co-op until you turn it off.'))return;
   say('#cfgMsg','Saving…');try{await admin('cfgset',[],cfg);say('#cfgMsg','Live. Players see it within about 5 minutes (or when they reload).','ok');}catch(e){say('#cfgMsg','Not saved: '+e.message,'bad');}};
-/* ---- codes ---- */
 let VEH={};
 fetch('index.html',{cache:'no-store'}).then(r=>r.text()).then(src=>{const re=/\b([VA])\('(usa|ger|ussr|uk|fra)','(\w+)',(\d),'(\w+)','((?:[^'\\]|\\.)*)',\{([^\n]*)/g;let m;const list=[];
   while((m=re.exec(src)))if(!/\badmin:1/.test(m[7]))list.push({id:m[5],name:m[6].replace(/\\'/g,"'"),nat:m[2],cls:m[3],tier:+m[4]});
@@ -254,7 +230,6 @@ $('#kGo').onclick=async()=>{const k=$('#kKind').value,d={k,uses:Math.max(1,Math.
     say('#kMsg','Give this to '+(d.uses>1?'up to '+d.uses+' people':'one person')+'. It works '+(d.uses>1?'once per device':'once')+'.','ok');loadCodes();}catch(e){say('#kMsg','Not made: '+e.message,'bad');}};
 $('#kCopy').onclick=()=>navigator.clipboard.writeText($('#kCode').textContent).then(()=>say('#kMsg','Copied.','ok'),()=>say('#kMsg','Copy did not work: select the code and copy it by hand.','bad'));
 let CODES=[],allOn=true;
-/* the server's list can lag up to a minute behind a change, so changes made here are laid over it for 90 s */
 const OVER=new Map(),fresh=(id,r,x)=>OVER.set(id,Object.assign({r,t:Date.now()},x));
 const stOf=r=>r.off?'off':r.n>=r.uses?'done':r.exp&&Date.now()>r.exp?'exp':'ready';
 const stTxt={ready:'ready',done:'used up',exp:'expired',off:'switched off'};
@@ -277,7 +252,6 @@ async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))).map
   if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));for(const id of ids)fresh(id,null);await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
 $('#cDelDone').onclick=()=>delWhere(s=>s==='done','used-up');
 $('#cDelExp').onclick=()=>delWhere(s=>s==='exp','expired');
-/* ---- redeem log & badges ---- */
 async function loadLog(){say('#gMsg','Loading…');try{const L=(await admin('log')).log.slice().reverse(),box=$('#gList');box.textContent='';
     for(const x of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[[when(x.t),'d'],[x.id,'c'],[String(x.p||'').replace(/^rp:(\d+)/,(m,n)=>(+n).toLocaleString()+' RP').replace(/^veh:(\w+)/,(m,v)=>VEH[v]||v).replace('all_vehicles','Every vehicle').replace('badge','Badge'),'k'],[x.name||'(no name)','d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}box.append(it);}
     say('#gMsg',L.length?'':'Nobody has redeemed a code yet.');}catch(e){say('#gMsg','Could not load: '+e.message,'bad');}}

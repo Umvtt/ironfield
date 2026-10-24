@@ -2027,9 +2027,6 @@ function trTree(root){tring=true;const w=document.createTreeWalker(root,NodeFilt
 function setLang(l){lang=l==='tr'?'tr':'en';try{localStorage.setItem('ironfield-lang',lang);}catch(e){}document.documentElement.lang=lang;$('#langSel').value=lang;trTree(document.body);}
 new MutationObserver(ms=>{if(tring)return;tring=true;for(const m of ms){if(m.type==='characterData'){const t=m.target;if(orig.has(t)&&(TR[orig.get(t)]===t.nodeValue.trim()||orig.get(t)===t.nodeValue.trim()))continue;orig.delete(t);trNode(t);}else for(const a of m.addedNodes){if(a.nodeType===3){trNode(a);}else if(a.nodeType===1){tring=false;trTree(a);tring=true;}}}tring=false;}).observe(document.body,{childList:true,subtree:true,characterData:true});
 $('#langSel').addEventListener('change',e=>setLang(e.target.value));setLang(lang);
-/* redeem codes: a small Cloudflare Worker (tools/codes-worker.js, address in codes.json) checks each code's signature and
-   remembers used ones, so every code works for exactly one person. Perks live in PERK for this page session only.
-   Guests pass the worker's ticket to the host, who asks the worker to confirm it before allowing admin vehicles. */
 let codeApi=null;
 async function codeAPI(){if(codeApi!==null)return codeApi;try{const r=await fetch('codes.json?t='+Date.now(),{cache:'no-store'});const c=r.ok?await r.json():null;codeApi=c&&typeof c.api==='string'&&/^https:\/\/[a-z0-9.-]+(\/[a-z0-9._-]*)?$/i.test(c.api)?c.api.replace(/\/$/,''):'';}catch(e){codeApi='';}return codeApi;}
 async function codeCall(path,body){const api=await codeAPI();if(!api)return{ok:false,reason:'setup'};try{const r=await fetch(api+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return await r.json();}catch(e){return{ok:false,reason:'net'};}}
@@ -2062,7 +2059,7 @@ function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';con
   const m=rpMul();if(m>1)add((m===2?'Double':m===3?'Triple':m+'×')+' RP event'+(LIVE.rp.until?' · until '+new Date(LIVE.rp.until).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}):''),'ev');
   if(LIVE.maint.on)add(LIVE.maint.text||'Multiplayer is closed for maintenance. Solo still works.','mt');
   el.hidden=!el.childNodes.length;}
-/* verified badges: every player checks the tokens they see with the server, and a badge only shows under the callsign it was given to */
+/* badges: checked with the server, shown only under the callsign they belong to */
 const BADGE=new Map();
 function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BADGE.has(tk)))].slice(0,20);if(!need.length)return;for(const tk of need)BADGE.set(tk,null);
   codeCall('/badge',{tks:need}).then(r=>{if(!r||!r.ok||!r.labels||typeof r.labels!=='object'){for(const tk of need)BADGE.delete(tk);return;}
