@@ -2071,11 +2071,11 @@ function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LI
     if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
     if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
     if(notes.length)liveNote(notes);}
-  if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&(net.mode!=='off'||state!=='hangar'))maintKick();
+  if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&net.mode!=='off')maintKick();
   liveSeen=true;
   if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild)needUpdate();}
 function maintKick(){const msg=LIVE.maint.text||'Ironfield is down for maintenance. We\'ll be back soon.';
-  try{if(net.mode!=='off')leaveCoop();if(state!=='hangar')toHangar();}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
+  try{if(net.mode!=='off'){leaveCoop();if(state!=='hangar')toHangar();}}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
 async function needUpdate(){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
   let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
   if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}
