@@ -2158,6 +2158,11 @@ function guestProfile(pe){return{rp:pe.rp||0,owned:[...new Set(save.owned.filter
 function guestResearch(pe,T){const P=guestProfile(pe),host=save,pk=PERK.all;save=P;PERK.all=false;abOff=true;let ok=false;try{ok=applyResearch(T);}finally{save=host;PERK.all=pk;abOff=false;}
   if(ok){pe.rp=P.rp;(pe.mine||(pe.mine=new Set())).add(T.id);}return ok;}
 /* a leaving guest's leftover RP goes into the host's save; their research is remembered by name for a rejoin */
+/* a guest who drops is held for 2 minutes: if they come back under the same name they keep their RP, research and
+   battle stats; otherwise their RP goes to the host's save as usual */
+function holdGuest(pe){if(!pe.name)return;const k=pe.name.toLowerCase(),A=net.away||(net.away={});if(A[k])clearTimeout(A[k].timer);
+  A[k]={name:pe.name,rp:pe.rp||0,mine:pe.mine,stats:pe.stats,timer:setTimeout(()=>{if(net.away&&net.away[k]){bankGuest(net.away[k]);delete net.away[k];}},120000)};pe.rp=0;}
+function bankAway(){for(const k in net.away||{}){clearTimeout(net.away[k].timer);bankGuest(net.away[k]);}net.away={};}
 function bankGuest(pe){if(!pe.name)return;(net.left||(net.left={}))[pe.name.toLowerCase()]=[...(pe.mine||[])];const n=Math.round(pe.rp||0);pe.rp=0;
   if(n>0){save.rp+=n;persist();sysAll(pe.name+'\'s '+fmt(n)+' RP went to '+store.name+'\'s save');}}
 /* research against the real save (owned() also counts session perks, which must not make research free) */
@@ -2851,7 +2856,7 @@ function sysAll(text){addChat(null,text,'sys');if(net.mode==='host')netSend({e:'
 /* ---- host ---- */
 function newPeer(conn){return{pid:'p'+(pidSeq++),conn,open:false,name:'',tank:null,t:null,stats:null,input:null,inputAt:0,lastClicks:undefined,lastPicks:undefined,acts:[],chatIn:[],events:[],rtt:0,lastRx:performance.now(),pingAt:0,deathCause:''};}
 /* multiplayer only runs on the official website (localhost is allowed for testing); downloaded copies play solo */
-const MP_LOCK=true;/* owner's emergency lock: set to false to open multiplayer again */
+const MP_LOCK=false;/* owner's emergency lock: true closes multiplayer for everyone */
 const MP_OK=!MP_LOCK&&['umvtt.github.io','localhost','127.0.0.1'].includes(location.hostname)&&location.protocol!=='file:';
 const MP_NO=MP_LOCK?'Multiplayer is closed for now. We\'ll be back soon.':'Multiplayer only works on the website: umvtt.github.io/ironfield. This copy can play solo.';
 const MY_BUILD=(document.querySelector('meta[name="ironfield-version"]')||{}).content||'';
@@ -2862,7 +2867,8 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
-liveCfg().then(liveConnect);setInterval(()=>{if(!document.hidden)liveCfg();},10000);checkBadges([store.badge]);
+let livePoll=Date.now();liveCfg().then(liveConnect);
+setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>300000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},15000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   if(!MP_OK){coopStatus(MP_NO,true);return;}await liveCfg();if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}if(!await ensureFresh())return;
@@ -2878,7 +2884,7 @@ async function hostCoop(){
   catch(err){netError(err);}
 }
 function peerClosed(pe){if(!net.peers.has(pe.pid))return;const was=pe.open;net.peers.delete(pe.pid);pe.open=false;try{pe.conn.close();}catch(e){}
-  if(pe.t)dropPeerTank(pe,(pe.name||'A player')+' disconnected');votes.delete(pe.pid);updConn();bankGuest(pe);
+  if(pe.t)dropPeerTank(pe,(pe.name||'A player')+' disconnected');votes.delete(pe.pid);updConn();holdGuest(pe);
   if(was&&pe.name){sysAll(pe.name+' left the room');toast(pe.name+' left the room');}net.lobbyKey='';sendLobby(true);coopUI();}
 function dropPeerTank(pe,msg){const t=pe.t;pe.t=null;if(t){const i=tanks.indexOf(t);if(i>=0)tanks.splice(i,1);t.peer=null;}votes.delete(pe.pid);if(msg&&state!=='hangar')sayAll(msg,'#ebd257');}
 function hostData(pe,d){
@@ -2887,7 +2893,8 @@ function hostData(pe,d){
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)pe.rtt=pe.rtt?pe.rtt*.6+r*.4:r;return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
     const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;pe.tank=T&&(!T.admin||peAll(pe))?d.tank:'m4a1';pe.bt=cleanBt(d.bt);checkBadges([pe.bt]);const n=hostName(pe,cleanName(d.name));pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
-    if(first){pe.rp=0;pe.mine=new Set(net.left&&net.left[pe.name.toLowerCase()]||[]);sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');sfx.ping();}
+    if(first){const k=pe.name.toLowerCase(),back=net.away&&net.away[k];pe.rp=0;pe.mine=new Set(net.left&&net.left[k]||[]);
+      if(back){clearTimeout(back.timer);delete net.away[k];pe.rp=back.rp;pe.mine=back.mine||pe.mine;pe.stats=back.stats||pe.stats;sysAll(pe.name+' reconnected');}else{sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');}sfx.ping();}
     net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o,mn:!!d.mn};return;}
   if(d.e==='act'){if(!rateOk(pe.acts,1000,8))return;const t=pe.t;if(t&&t.alive&&state==='play'&&['ext','rep','arty','ord','land','gear','nuke'].includes(d.a))doAct(t,d.a,num(d.x,0,WW),num(d.y,0,WH));return;}
@@ -2907,9 +2914,9 @@ function hotJoin(pe){const mate=humans().find(h=>h.alive)||player;if(!mate)retur
   sendStart(pe);sayAll(pe.name+' joined the battle in the '+pe.t.T.name,'#8bd66e');net.lobbyKey='';sendLobby();}
 let bgTimer=null;
 function netHeartbeat(){if(net.mode==='off')return;const now=performance.now();
-  if(net.mode==='host'){for(const pe of peerList()){if(now-pe.pingAt>2000){pe.pingAt=now;sendTo(pe,{e:'ping',t:now});}if(now-pe.lastRx>9000)peerClosed(pe);}return;}
+  if(net.mode==='host'){for(const pe of peerList()){if(now-pe.pingAt>2000){pe.pingAt=now;sendTo(pe,{e:'ping',t:now});}if(now-pe.lastRx>15000)peerClosed(pe);}return;}
   if(!net.connected)return;if(now-(net.pingAt||0)>2000){net.pingAt=now;netSend({e:'ping',t:now});}
-  if(net.lastRx&&now-net.lastRx>9000){net.lastRx=0;const c=net.conn;onClose();try{if(c)c.close();}catch(e){}}}
+  if(net.lastRx&&now-net.lastRx>15000){net.lastRx=0;const c=net.conn;onClose();try{if(c)c.close();}catch(e){}}}
 /* browsers freeze hidden tabs; a tiny worker keeps the host's battle (and the heartbeat) ticking */
 function bgStep(){netHeartbeat();if(!document.hidden||state!=='play'||net.mode==='off')return;const now=performance.now();let el=Math.min(1,(now-last)/1000);last=now;
   while(el>1e-4&&state==='play'){const dt=Math.min(.05,el);el-=dt;if(net.mode==='host')update(dt);else guestUpdate(dt);}}
@@ -2944,12 +2951,12 @@ function attach(conn){net.conn=conn;
   conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
   if(net.hostBenched){net.hostBenched=false;state='hangar';}
-  const c=net.conn,p=net.peer;if(net.mode==='host'){for(const pe of net.peers.values()){bankGuest(pe);try{pe.conn.close();}catch(e){}}}
+  const c=net.conn,p=net.peer;if(net.mode==='host'){bankAway();for(const pe of net.peers.values()){bankGuest(pe);try{pe.conn.close();}catch(e){}}}
   Object.assign(net,{mode:'off',peer:null,conn:null,connected:false,code:'',chat:[],lobbyKey:'',peers:new Map(),squad:[],names:{},locked:false,banned:null,room:null});for(const b of[$('#lockBtn'),$('#lockBtn2')])b.textContent='Lock room';net.remote={tank:null,name:'',st:0,fr:1};net.myTank=null;useProfile();
   try{if(c)c.close();}catch(e){}try{if(p)p.destroy();}catch(e){}if(state==='hangar')renderHangar();coopUI();
 }
 /* a host closing the page still pays its guests' leftover RP into its save */
-addEventListener('pagehide',()=>{if(net.mode==='host')for(const pe of net.peers.values())bankGuest(pe);});
+addEventListener('pagehide',()=>{if(net.mode==='host'){bankAway();for(const pe of net.peers.values())bankGuest(pe);}});
 function netError(err){
   const t=err&&err.type;
   if(net.mode==='host'&&net.connected&&t&&t!=='unavailable-id'&&t!=='network'&&t!=='server-error'&&t!=='socket-error'&&t!=='socket-closed')return;
@@ -2958,16 +2965,21 @@ function netError(err){
     (err&&err.message==='load failed')?'Couldn\'t load the networking library. Check your internet connection.':'Connection problem'+(t?' ('+t+')':'')+'. Try again.';
   const inGame=state!=='hangar';const wasHost=net.mode==='host';leaveCoop();if(inGame&&!wasHost)toHangar(true);coopStatus(msg,true);
 }
+let rejoin={code:'',n:0};
 function onClose(){
   if(net.mode!=='guest'||!net.conn)return;const was=net.connected;net.connected=false;net.conn=null;
   const quick=was&&performance.now()-(net.openAt||0)<5000;
   const n=mateName(),code=net.code,inGame=state!=='hangar';leaveCoop();if(inGame)toHangar(true);$('#joinCode').value=code;
+  if(rejoin.code!==code)rejoin={code,n:0};
+  if(rejoin.n<(quick?1:4)){rejoin.n++;coopStatus('Lost the connection to '+n+'\'s room. Reconnecting ('+rejoin.n+')…');setTimeout(()=>{if(net.mode==='off')joinCoop(code);},1500*rejoin.n);return;}
+  rejoin={code:'',n:0};
   coopStatus(quick?'The room dropped you right after you connected. That usually means you and the host are on different versions: both of you refresh the page (close the tab or app and open it again), then join.':'Lost the connection to '+n+'\'s room. Press Join to reconnect.',true);if(was)toast('Disconnected from '+n);
 }
 function guestData(d){
   if(!d.e)return;
   if(d.e==='ping'){netSend({e:'pong',t:num(d.t,0,1e15)});return;}
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)net.rtt=net.rtt?net.rtt*.6+r*.4:r;return;}
+  if(d.e==='lobby')rejoin.n=0;
   if(d.e==='lobby'&&d.v!==PROTO){leaveCoop();coopStatus('That room\'s host is running an old copy of the game. They need to play on the website: umvtt.github.io/ironfield',true);return;}
   if(d.e==='lobby'&&d.pf&&typeof d.pf==='object'){const f=d.pf,r=net.room||(net.room=freshSave());r.rp=Math.round(num(f.rp,0,1e9));r.best=Math.round(num(f.best,0,1e4));r.checkpoint=Math.round(num(f.cp,0,1e4));
     if(Array.isArray(f.owned)){r.owned=[...new Set(f.owned.slice(0,400).filter(id=>tget(id)&&!TYPE[id].admin).concat(STARTERS))];r.earned=r.owned.slice();}if(!owned(r.sel))r.sel='m4a1';
@@ -3122,7 +3134,7 @@ function fxApply(e,remote){
   }
 }
 $('#hostBtn').addEventListener('click',()=>{ensureAudio();hostCoop();});
-$('#joinBtn').addEventListener('click',()=>{ensureAudio();joinCoop($('#joinCode').value);});
+$('#joinBtn').addEventListener('click',()=>{ensureAudio();rejoin={code:'',n:0};joinCoop($('#joinCode').value);});
 $('#joinCode').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();joinCoop($('#joinCode').value);}});
 $('#joinCode').addEventListener('input',e=>{const el=e.target;el.value=el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);});
 $('#leaveBtn').addEventListener('click',()=>{leaveCoop();coopStatus('You left the room.');});
