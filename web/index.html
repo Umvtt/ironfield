@@ -711,7 +711,7 @@ function updPlane(t,dt){
   planeCosmetic(t,dt);
 }
 /* players get a gentle aim assist: when an enemy aircraft's lead point is within about 7 degrees of the nose, the guns converge on it */
-function gunAssist(t){if(t.pai||t.team!=='p')return 0;let best=null,be=.12;for(const o of tanks){if(!o.air||!o.alive||o.team===t.team||o.crash)continue;const d=Math.hypot(o.x-t.x,o.y-t.y);if(d>760)continue;
+function gunAssist(t){if(t.team!=='p')return 0;let best=null,be=.15;for(const o of tanks){if(!o.air||!o.alive||o.team===t.team||o.crash)continue;const d=Math.hypot(o.x-t.x,o.y-t.y);if(d>850)continue;
     const lt=d/(BULLET_V+t.v),e=norm(Math.atan2(o.y+o.vy*lt-t.y,o.x+o.vx*lt-t.x)-t.a);if(Math.abs(e)<be){be=Math.abs(e);best=e;}}return best===null?0:best;}
 function planeShoot(t,g,i){const T=t.T,spread=(t.team==='p'?.012:.03)+(g.c>=30?.006:0),a=t.a+gunAssist(t)+rand(-spread,spread)+(T.guns.length>1?(i-(T.guns.length-1)/2)*.004:0);
   const ox=t.x+Math.cos(t.a)*T.L*.42,oy=t.y+Math.sin(t.a)*T.L*.42,sp=BULLET_V+t.v;
@@ -758,10 +758,10 @@ function planeDown(t,by,why){if(!t.alive)return;t.crash=true;t.spin=rand(-1.6,1.
 function shotVsPlanes(s,ax,ay,bx,by){const own=s.owner,air=s.kind==='bullet',flak=s.T&&s.T.aa;
   for(const t of tanks){if(!t.air||!t.alive||t===own)continue;if(own&&own.team===t.team)continue;
     if(!air&&!flak&&t.alt>.45)continue;
-    const R=t.T.hitR+(flak&&s.T.fz?s.T.fz:0)+(air?(isHuman(own)?5:2):0);if(segCircle(ax,ay,bx,by,t.x,t.y,R)<0)continue;
-    if(air){const g=s.g;planeHit(t,g.d,g.pe,own,'gun');fx({k:'spark',x:r1(t.x+rand(-6,6)),y:r1(t.y+rand(-6,6))});return true;}
-    if(flak&&s.T.fz){const dmg=(s.T.c<=20?30:s.T.c<=30?45:s.T.c<=40?80:130)*1.05,inner=segCircle(ax,ay,bx,by,t.x,t.y,t.T.hitR)>=0;planeHit(t,dmg*(inner?1.25:.7),40,own,s.T.c>30?'flak':'flak1');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
-    if(flak){planeHit(t,(s.T.c<=8?14:s.T.c<=13?24:40)*1.05,s.T.pe,own,'gun');fx({k:'spark',x:r1(s.x),y:r1(s.y)});return true;}
+    const ours=own&&own.team==='p',R=t.T.hitR+(flak&&s.T.fz?s.T.fz*(ours?1.3:1):0)+(air?(isHuman(own)?5:ours?4:2):0);if(segCircle(ax,ay,bx,by,t.x,t.y,R)<0)continue;
+    if(air){const g=s.g;planeHit(t,g.d*(ours&&!s.gunner?1.25:1),g.pe,own,'gun');fx({k:'spark',x:r1(t.x+rand(-6,6)),y:r1(t.y+rand(-6,6))});return true;}
+    if(flak&&s.T.fz){const dmg=(s.T.c<=20?30:s.T.c<=30?45:s.T.c<=40?80:130)*1.05*(ours?1.45:1),inner=segCircle(ax,ay,bx,by,t.x,t.y,t.T.hitR)>=0;planeHit(t,dmg*(inner?1.25:.7),40,own,s.T.c>30?'flak':'flak1');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
+    if(flak){planeHit(t,(s.T.c<=8?14:s.T.c<=13?24:40)*1.05*(ours?1.45:1),s.T.pe,own,'gun');fx({k:'spark',x:r1(s.x),y:r1(s.y)});return true;}
     planeHit(t,60+s.T.c*1.8,s.T.pe,own,'gun');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});return true;}
   return false;}
 /* aircraft cannon from above: roof armor, steep angle (about 45 degrees) */
@@ -1399,7 +1399,7 @@ function newReport(){return{ko:[],destroyed:[],damaged:[],boom:false,fire:false,
 /* enemy fire is softened against human players so one hit rarely wipes a tank; your own shells keep full power */
 const PLAYER_TAKES={crew:.42,mod:.5,ammo:.25,fire:.45};
 function hurt1(t,c,dmg,rep){
-  if(t.T.immortal)return;const hum=isHuman(t);if(hum)dmg*=c.kind==='crew'?PLAYER_TAKES.crew:PLAYER_TAKES.mod;
+  if(t.T.immortal)return;const hum=isHuman(t);if(hum)dmg*=c.kind==='crew'?PLAYER_TAKES.crew:PLAYER_TAKES.mod;if(t.team==='p')dmg/=swarmK;
   if(c.kind==='crew'){if(!c.alive)return;c.hp-=dmg;if(c.hp<=0){c.hp=0;c.alive=false;rep.ko.push(ROLE_NAME[c.role]);}return;}
   if(c.hp<=0)return;const before=c.hp;c.hp=Math.max(0,c.hp-dmg);
   if(c.type==='ammo'&&dmg>=25){const fill=t.rounds/t.T.n;if(Math.random()<(c.hp<=0?.55:.18)*(.25+.75*fill)*(hum?PLAYER_TAKES.ammo:1)*(rep.ammoMul||1))rep.boom=true;}
@@ -1552,7 +1552,7 @@ function artyWhistle(s){if(s.whistled||s.tof-s.t>1.3)return;const v=viewer();if(
 function fireTank(t){
   const T=t.T,m=muzzle(t);
   if(T.cl){t.clipLeft--;if(t.clipLeft>0){t.reload=T.it;t.reloadMax=T.it;}else{t.reload=T.rl;t.reloadMax=T.rl;}}
-  else{const k=t.team==='e'?1.44-.3*diff():1;t.reload=T.rl*k;t.reloadMax=t.reload;}
+  else{const k=t.team==='e'?1.44-.3*diff():1/(1+(swarmK-1)*.6);t.reload=T.rl*k;t.reloadMax=t.reload;}
   t.rounds--;t.recoil=1;
   fx({k:'muz',x:r1(m.mx),y:r1(m.my),a:r3(m.ga),c:T.c,n:t.nid});
   if(t.stats)t.stats.shots++;if(t===player)shotsF++;
@@ -1622,7 +1622,7 @@ function aiUpdate(t,dt){
   if(A.los&&!A.hadLos){A.delay=rand(1,1.8)-.5*diff();A.shots=0;A.errT=0;}A.hadLos=A.los;A.delay-=dt;
   drive(t,dt,ang,dist);
   if(!t.canFire||t.reload>0)return;
-  if(direct){if(A.los&&dist<1200&&A.delay<=0){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.055&&clearLine(m.mx,m.my,p.x,p.y)&&!allyInLine(t,dist)){fire(t,dist);A.shots++;A.errT=0;
+  if(direct){if(A.los&&dist<1200&&A.delay<=0&&fireSlot(p)){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.055&&clearLine(m.mx,m.my,p.x,p.y)&&!allyInLine(t,dist)){fire(t,dist);p.shotAt.push(time);A.shots++;A.errT=0;
     if(T.td&&!T.arty&&A.shots%2===0&&Math.random()<.6)A.until=time+rand(.8,1.6);}}}
   else{const sol0=artySolution(T,dist,0,false);if(!sol0.ok)return;let tx=p.x+p.vx*sol0.tof*.9,ty=p.y+p.vy*sol0.tof*.9;
     const mates=targets().filter(h=>h!==p&&h.alive&&!h.air&&Math.hypot(h.x-p.x,h.y-p.y)<220);if(mates.length){const cx=(p.x+mates.reduce((a,h)=>a+h.x,0))/(mates.length+1),cy=(p.y+mates.reduce((a,h)=>a+h.y,0))/(mates.length+1);tx+=(cx-p.x)*.5;ty+=(cy-p.y)*.5;}
@@ -1648,7 +1648,7 @@ function spawnAllies(nP){const lead=humans().find(h=>h.alive)||player;if(!lead)r
 /* threat score: low attackers and bombers come first, then whoever is closest */
 function airThreat(t,h){const d=Math.hypot(h.x-t.x,h.y-t.y);return d*(h.alt<.6?.6:1)*(h.T.cls==='bomber'?.75:1)*(h.crash?9:1);}
 function leadAim(t,h,v){let lt=Math.hypot(h.x-t.x,h.y-t.y)/v;for(let k=0;k<2;k++)lt=Math.hypot(h.x+h.vx*lt-t.x,h.y+h.vy*lt-t.y)/v;return[h.x+h.vx*lt,h.y+h.vy*lt];}
-function aaAI(t,dt){let best=null,bs=1e9;const R=t.T.radar?1300:1100;for(const h of targets()){if(!h.alive||!h.air||Math.hypot(h.x-t.x,h.y-t.y)>R)continue;const sc=airThreat(t,h);if(sc<bs){bs=sc;best=h;}}const bd=best?Math.hypot(best.x-t.x,best.y-t.y):0;
+function aaAI(t,dt){let best=null,bs=1e9;const R=(t.T.radar?1300:1100)*(t.team==='p'?1.15:1);for(const h of targets()){if(!h.alive||!h.air||Math.hypot(h.x-t.x,h.y-t.y)>R)continue;const sc=airThreat(t,h);if(sc<bs){bs=sc;best=h;}}const bd=best?Math.hypot(best.x-t.x,best.y-t.y):0;
   if(!best){t.aimAir=false;return false;}const A=t.ai,T=t.T;
   if(A.airTgt!==best){A.airTgt=best;A.airDelay=rand(.6,1.1)-.3*diff();}A.airDelay-=dt;
   const[ax,ay]=leadAim(t,best,T.shellV);A.errT-=dt;if(A.errT<=0){A.err=rand(-1,1)*(T.radar?.017:.026)*(1-.35*diff());A.errT=rand(.35,.8);}
@@ -1955,7 +1955,7 @@ function act(a){if(state!=='play')return;if(a==='nuke'&&net.mode!=='off'&&!myAb(
 function doAct(t,a,x,y){if(!t)return;if(a==='nuke'&&net.mode!=='off'&&!abOf(t).has('nuke'))return;if(a==='ord')planeOrd(t);else if(a==='ext')extinguish(t);else if(a==='rep'){if(t.air)say(t,'No repairs in the air: land on your airfield to repair','#8e8a6b');else repair(t);}else if(a==='land')toggleLand(t);else if(a==='gear')toggleGear(t);else if(a==='arty')callArty(t,x,y,t===player?Math.max(200,artyPickR()):200);else if(a==='nuke')launchNuke(x,y,t);}
 function extinguish(p){if(!p||!p.alive||p.fire<=0)return;if(p.extCD>0){say(p,'Extinguisher recharging ('+Math.ceil(p.extCD)+' s)','#8e8a6b');return;}p.fire=0;p.extCD=25;say(p,'Fire extinguished','#8bd66e');}
 function repair(p){if(!p||!p.alive||p.repT>0)return;if(p.repCD>0){say(p,'Repair kit ready in '+Math.ceil(p.repCD)+' s','#8e8a6b');return;}
-  if(!p.comps.some(c=>c.hp<c.max&&(c.kind==='mod'||c.alive))&&p.tracksT<=0){say(p,'Nothing to repair','#8e8a6b');return;}p.repT=6;p.repCD=45;say(p,'Repairing: hold still for 6 s','#d8cfa2');}
+  if(!p.comps.some(c=>c.hp<c.max&&(c.kind==='mod'||c.alive))&&p.tracksT<=0){say(p,'Nothing to repair','#8e8a6b');return;}p.repT=6/swarmK;p.repCD=45/swarmK;say(p,'Repairing: hold still for '+Math.ceil(p.repT)+' s','#d8cfa2');}
 function callArty(p,x,y,r){if(!p||!p.alive)return;if(p.artyCD>0){say(p,'Artillery support ready in '+Math.ceil(p.artyCD)+' s','#8e8a6b');return;}
   const tg=enemyNear(x,y,r||200);if(!tg){say(p,'Point at an enemy tank to call artillery support on it','#ebd257');return;}
   p.artyCD=75;strikes.push({x:tg.x,y:tg.y,t:6.4,target:tg});
@@ -2339,8 +2339,14 @@ function drawPreview(T){const c=$('#preview');if(!c)return;const g=c.getContext(
   drawTank(g,{T,x:0,y:0,a:0,tr:0,alive:true,team:'p',odo:0,tracksT:0,comps:T.layout.map(q=>Object.assign({},q,{hp:q.max||100,alive:true})),recoil:0,fire:0});}
 
 /* ================= update ================= */
+/* outnumbered: the more enemy ground vehicles per vehicle on our side (players and AI allies), the tougher and faster
+   our side gets: from 2.5 enemies each, up to 1.8× (less damage taken, faster reloads and repairs) */
+let swarmK=1;
+/* no pile-ons: only 3 enemy tank shots per 1.6 s (2 when badly outnumbered) may go at the same vehicle on our side; the rest wait their turn */
+function fireSlot(p){const L=p.shotAt||(p.shotAt=[]);while(L.length&&time-L[0]>1.6)L.shift();return L.length<(swarmK>1.3?2:3);}
+function swarmUpd(){if(net.mode==='guest')return;let e=0,f=0;for(const t of tanks){if(!t.alive||t.air)continue;if(t.team==='e')e++;else if(t.team==='p')f++;}const r=e/Math.max(1,f);swarmK+=(clamp(1+(r-2.5)*.1,1,1.8)-swarmK)*.05;}
 function update(dt){
-  time+=dt;nukeCD=Math.max(0,nukeCD-dt);
+  time+=dt;nukeCD=Math.max(0,nukeCD-dt);swarmUpd();
   playerInput(dt);
   {let alive=0;for(const t of tanks)if(t.team==='e'&&t.alive)alive++;const cap=12+3*playerCount();for(const q of spawnQueue.slice())if(time>=q.at){if(alive>=cap&&!q.air){q.at=time+1;continue;}spawnQueue.splice(spawnQueue.indexOf(q),1);if(q.air)spawnPlane(q.T);else spawnEnemy(q.T);alive++;}}
   if(save.frBoom){frenchT+=dt;if(frenchT>=10){frenchT-=10;for(const t of tanks.slice())if(t.alive&&t.T.nation==='fra'&&Math.random()<.2){kill(t,null,'french');say(t,'Your '+t.T.name+' spontaneously exploded. French engineering.','#ee5d50');}}}
@@ -2759,7 +2765,7 @@ function hud(){
       ctx.fillStyle='rgba(16,19,13,.7)';ctx.fillRect(lx-w/2,ly-10,w,14);ctx.fillStyle='#8bd66e';ctx.fillText(lab,lx,ly);}
     ctx.textAlign='left';}
   /* wave status */
-  const left=enemiesLeft(),canN=!touch&&net.mode!=='guest',wtxt=phase==='break'?'BREAK · VOTE TO START'+(canN?' (N)':''):left+(left===1?' HOSTILE':' HOSTILES');
+  const left=enemiesLeft(),canN=!touch&&net.mode!=='guest',wtxt=phase==='break'?'BREAK · VOTE TO START'+(canN?' (N)':''):left+(left===1?' HOSTILE':' HOSTILES')+(swarmK>1.05&&phase!=='break'?' · OUTNUMBERED +'+Math.round((swarmK-1)*100)+'%':'');
   const ping=net.mode==='host'?(net.connected?humans().length+' PLAYERS · ROOM '+net.code:'ROOM '+net.code+' OPEN'):net.mode==='guest'?(net.connected?(net.rtt?'PING '+Math.round(net.rtt)+' MS':'PING …'):'DISCONNECTED'):'';
   if(!compact&&VW>=1000){const w=470;ctx.fillStyle='rgba(16,19,13,.75)';ctx.fillRect(VW/2-w/2,top,w,42);ctx.textAlign='left';ctx.fillStyle='#d8cfa2';ctx.font='19px "Saira Stencil One",Impact,sans-serif';ctx.fillText('WAVE '+wave,VW/2-w/2+12,top+28);
     ctx.font='600 12px "IBM Plex Mono",monospace';ctx.fillStyle=phase==='break'?'#8bd66e':'#ee5d50';ctx.fillText(wtxt,VW/2-w/2+104,top+26);ctx.textAlign='right';ctx.fillStyle='#f2a23a';ctx.fillText(fmt(save.rp)+' RP',VW/2+w/2-12,top+19);ctx.font='600 10px "IBM Plex Mono",monospace';ctx.fillStyle=rpFlash>0?'#8bd66e':'#8e8a6b';ctx.fillText('+'+fmt(battleRP)+' THIS BATTLE',VW/2+w/2-12,top+34);
@@ -3026,7 +3032,7 @@ function sendSnapshot(){
   const shared=JSON.stringify({e:'snap',w:wave,ph:phase==='break'?1:0,pt:r1(phaseT),l:enemiesLeft(),nc:r1(nukeCD),host:player?player.nid:0,hn,
     tk:tanks.map(packTank),
     sh:shells.map(packShell).filter(Boolean),
-    nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
+    sw:r2(swarmK),nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
   net.events=[];const head=shared.slice(0,-1);
   for(const pe of list){const me=pe.t?packMe(pe.t):null,ev=pe.events;pe.events=[];
     sendTo(pe,head+',"pr":'+Math.round(pe.rp||0)+',"you":'+(pe.t?pe.t.nid:0)+',"vt":'+JSON.stringify([votes.size,n,votes.has(pe.pid)?1:0,need])+',"me":'+JSON.stringify(me)+',"pev":'+JSON.stringify(ev)+'}');}
@@ -3108,7 +3114,7 @@ function guestStart(m){
 function applySnap(m){
   if(Array.isArray(m.vt))gVotes={n:num(m.vt[0],0,99),of:num(m.vt[1],1,99),me:!!m.vt[2],need:num(m.vt[3],1,99)};
   if(net.room&&m.pr!==undefined)net.room.rp=Math.round(num(m.pr,0,1e9));
-  wave=Math.round(num(m.w,0,1e4));phase=m.ph?'break':'combat';phaseT=num(m.pt,0,1e6);gLeft=Math.round(num(m.l,0,999));nukeCD=num(m.nc,0,99);if(m.you)myNid=m.you;hostNid=m.host;
+  swarmK=num(m.sw,1,1.8)||1;wave=Math.round(num(m.w,0,1e4));phase=m.ph?'break':'combat';phaseT=num(m.pt,0,1e6);gLeft=Math.round(num(m.l,0,999));nukeCD=num(m.nc,0,99);if(m.you)myNid=m.you;hostNid=m.host;
   if(Array.isArray(m.hn)){const nm={};for(const r of m.hn.slice(0,MAX_PLAYERS))if(Array.isArray(r))nm[num(r[0],0,1e9)]=cleanName(r[1])||'Teammate';net.names=nm;}
   const seen=new Set();
   if(!Array.isArray(m.tk)||!Array.isArray(m.sh)||!Array.isArray(m.ev)||!Array.isArray(m.nk)||!Array.isArray(m.st))return;
