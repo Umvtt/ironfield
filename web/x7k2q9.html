@@ -109,7 +109,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <div class="row" style="justify-content:space-between"><h2>Your codes</h2>
       <span class="row"><button class="ghost small" id="cRefresh" type="button">Refresh</button><button class="ghost small" id="allBtn" type="button">All codes: …</button></span></div>
     <div class="list" id="cList"></div>
-    <div class="row"><button class="ghost small" id="cDelDone" type="button">Delete used-up codes</button><button class="ghost small" id="cDelExp" type="button">Delete expired codes</button></div>
+    <div class="row"><button class="ghost small" id="cDelDone" type="button">Delete used-up codes</button><button class="ghost small" id="cDelExp" type="button">Delete expired codes</button><button class="danger small" id="cDelUnused" type="button">Delete all unused codes</button></div>
     <div class="msg" id="cMsg"></div>
   </section>
   <section class="card" data-pane="log" hidden>
@@ -266,6 +266,7 @@ async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))).map
   if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));for(const id of ids)fresh(id,null);await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
 $('#cDelDone').onclick=()=>delWhere(s=>s==='done','used-up');
 $('#cDelExp').onclick=()=>delWhere(s=>s==='exp','expired');
+$('#cDelUnused').onclick=()=>delWhere(s=>s==='ready'||s==='off','unused');
 async function loadLog(){say('#gMsg','Loading…');try{const L=(await admin('log')).log.slice().reverse(),box=$('#gList');box.textContent='';
     for(const x of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[[when(x.t),'d'],[x.id,'c'],[String(x.p||'').replace(/^rp:(\d+)/,(m,n)=>(+n).toLocaleString()+' RP').replace(/^veh:(\w+)/,(m,v)=>VEH[v]||v).replace('all_vehicles','Every vehicle').replace('badge','Badge'),'k'],[x.name||'(no name)','d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}box.append(it);}
     say('#gMsg',L.length?'':'Nobody has redeemed a code yet.');}catch(e){say('#gMsg','Could not load: '+e.message,'bad');}}
