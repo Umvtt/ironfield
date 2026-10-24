@@ -1083,7 +1083,9 @@ const PERK={all:false};
 /* in a room, admin vehicles count only with a redeemed code, even if the save has them from the solo admin button */
 /* badge abilities: what the server says this callsign's badge allows (nuke, admin, kick, vote) */
 const NOAB=new Set(),BADGE=new Map();let abOff=false;
-function badgeAb(tk,name){if(abOff)return NOAB;const v=tk&&BADGE.get(tk);return v&&v.ab&&v.n===String(name||'').toLowerCase()?v.ab:NOAB;}
+const NK={'0':'o','1':'i','l':'i','|':'i','!':'i','3':'e','4':'a','@':'a','5':'s','$':'s','7':'t','8':'b','9':'g','ı':'i','ğ':'g','ş':'s','ç':'c','ö':'o','ü':'u'};
+const nkey=n=>[...String(n||'').toLowerCase().normalize('NFKD')].map(ch=>NK[ch]||ch).join('').replace(/[^a-z0-9]/g,'').replace(/(.)\1+/g,'$1');
+function badgeAb(tk,name){if(abOff)return NOAB;const v=tk&&BADGE.get(tk);return v&&v.ab&&v.n===nkey(name)?v.ab:NOAB;}
 const myAb=()=>badgeAb(store.badge,store.name),peerAb=pe=>badgeAb(pe.bt,pe.name),abOf=h=>!h||h===player?myAb():h.peer?peerAb(h.peer):NOAB;
 const perkAll=()=>PERK.all||myAb().has('admin'),peAll=pe=>!!pe.perkAll||peerAb(pe).has('admin');
 const owned=id=>(perkAll()&&!!TYPE[id])||(save.owned.includes(id)&&!(net.mode!=='off'&&TYPE[id]&&TYPE[id].admin));
@@ -2134,7 +2136,7 @@ async function liveCfg(){const L=await codeAPIs();for(let i=0;i<L.length;i++){co
 let liveSeen=false;
 function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LIVE;
   LIVE={news:{on:!!n.on,text:liveTxt(n.text,300)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6)),
-    names:new Set((Array.isArray(c.names)?c.names:[]).slice(0,500).map(x=>cleanName(x).toLowerCase()).filter(Boolean)),bv:Math.round(num(c.bv,0,1e14))};
+    names:new Set((Array.isArray(c.names)?c.names:[]).slice(0,500).map(x=>nkey(cleanName(x))).filter(Boolean)),bv:Math.round(num(c.bv,0,1e14))};
   renderLive();lockNames();
   if(liveSeen&&LIVE.bv!==old.bv){const tks=[store.badge].concat(peerList().map(p=>p.bt),net.squad.map(r=>r[4])).filter(Boolean);for(const tk of tks)BADGE.delete(tk);checkBadges(tks);}
   if(liveSeen){const notes=[],nm=rpMul(),om=old.rp.mul>1&&(!old.rp.until||Date.now()<old.rp.until)?old.rp.mul:1;
@@ -2173,25 +2175,29 @@ function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';con
 /* badges: checked with the server, shown only under the callsign they belong to */
 function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BADGE.has(tk)))].slice(0,20);if(!need.length)return;for(const tk of need)BADGE.set(tk,'p');
   codeCall('/badge',{tks:need}).then(r=>{if(!r||!r.ok||!r.labels||typeof r.labels!=='object'){for(const tk of need)BADGE.delete(tk);return;}
-    for(const tk of need){const v=r.labels[tk];BADGE.set(tk,v&&typeof v==='object'?{l:cleanName(v.l),n:cleanName(v.n).toLowerCase(),ab:new Set((Array.isArray(v.ab)?v.ab:[]).filter(x=>['nuke','admin','kick','vote'].includes(x)))}:null);}lockNames();renderSquad();renderChat();if(state==='hangar')renderHangar();});}
+    for(const tk of need){const v=r.labels[tk];BADGE.set(tk,v&&typeof v==='object'?{l:cleanName(v.l),nm:cleanName(v.n),n:nkey(v.n),ab:new Set((Array.isArray(v.ab)?v.ab:[]).filter(x=>['nuke','admin','kick','vote'].includes(x)))}:null);}lockNames();renderSquad();renderChat();if(state==='hangar')renderHangar();});}
 /* a badge's callsign is locked: nobody else may use it (the owner can move it in the panel) */
-const nameLocked=n=>!!n&&LIVE.names.has(String(n).toLowerCase());
-const ownsName=(tk,n)=>{const v=tk&&BADGE.get(tk);return!!(v&&v.n&&v.n===String(n).toLowerCase());};
+const nameLocked=n=>!!n&&LIVE.names.has(nkey(n));
+const ownsName=(tk,n)=>{const v=tk&&BADGE.get(tk);return!!(v&&v.n&&v.n===nkey(n));};
 const nameOk=(tk,n)=>!nameLocked(n)||ownsName(tk,n);
-function hostName(pe,n){if(!n||nameOk(pe.bt,n)){pe.wantName=null;return n;}
+function hostName(pe,n){const v=pe.bt&&BADGE.get(pe.bt);if(v&&v.nm){pe.wantName=null;return v.nm;}if(!n||nameOk(pe.bt,n)){pe.wantName=null;return n;}
   if(pe.bt&&BADGE.get(pe.bt)==='p')pe.wantName=n;else sendTo(pe,{e:'sys',text:n+' is a locked callsign: pick another one'});return pe.name||'Guest '+pe.pid.slice(1);}
 function lockNames(){
-  if(nameLocked(store.name)&&!ownsName(store.badge,store.name)&&!(store.badge&&BADGE.get(store.badge)==='p')){store.name='Tanker-'+(100+Math.floor(Math.random()*900));persist();if(nameIn)nameIn.value=store.name;
+  const mine=store.badge?BADGE.get(store.badge):null;
+  if(mine&&mine.nm){if(store.name!==mine.nm){store.name=mine.nm;persist();if(nameIn)nameIn.value=store.name;if(net.connected)netSend({e:'name',name:store.name});renderSquad();}}
+  else if(nameLocked(store.name)&&(!store.badge||mine===null)){store.name='Tanker-'+(100+Math.floor(Math.random()*900));persist();if(nameIn)nameIn.value=store.name;
     toast('Someone with a badge owns that callsign, so yours was changed');if(net.connected)netSend({e:'name',name:store.name});renderSquad();}
+  if(nameIn){const own=!!(mine&&mine.nm);nameIn.readOnly=own;nameIn.title=own?'Your callsign belongs to your badge':'';}
   if(net.mode!=='host')return;let ch=false;
   for(const pe of peerList()){if(pe.wantName&&ownsName(pe.bt,pe.wantName)){pe.name=pe.wantName;pe.wantName=null;ch=true;}
     if(pe.wantTank&&peAll(pe)&&tget(pe.wantTank)){pe.tank=pe.wantTank;pe.wantTank=null;ch=true;}
-    else if(pe.name&&!nameOk(pe.bt,pe.name)&&BADGE.get(pe.bt)!=='p'){pe.name='Guest '+pe.pid.slice(1);sendTo(pe,{e:'sys',text:'Your callsign is locked to a badge holder: pick another one'});ch=true;}}
+    const pv=pe.bt&&BADGE.get(pe.bt);if(pv&&pv.nm&&pe.name!==pv.nm){pe.name=pv.nm;ch=true;}
+    else if(pe.name&&!nameOk(pe.bt,pe.name)&&(!pe.bt||pv===null)){pe.name='Guest '+pe.pid.slice(1);sendTo(pe,{e:'sys',text:'Your callsign is locked to a badge holder: pick another one'});ch=true;}}
   if(ch){net.lobbyKey='';sendLobby(true);coopUI();}}
-function badgeTkOf(name){if(!name)return '';const lo=String(name).toLowerCase();
-  if(net.mode==='guest'){const r=net.squad.find(r=>r[0].toLowerCase()===lo);return r&&r[4]||'';}
-  if(lo===store.name.toLowerCase())return store.badge;const pe=net.mode==='host'?peerList().find(p=>(p.name||'').toLowerCase()===lo):null;return pe&&pe.btOk||'';}
-function badgeFor(name){const tk=badgeTkOf(name),v=tk&&BADGE.get(tk);return v&&v.l&&v.n===String(name).toLowerCase()?v.l:'';}
+function badgeTkOf(name){if(!name)return '';const k=nkey(name);
+  if(net.mode==='guest'){const r=net.squad.find(r=>nkey(r[0])===k);return r&&r[4]||'';}
+  if(k===nkey(store.name))return store.badge;const pe=net.mode==='host'?peerList().find(p=>nkey(p.name)===k):null;return pe&&pe.btOk||'';}
+function badgeFor(name){const tk=badgeTkOf(name),v=tk&&BADGE.get(tk);return v&&v.l&&v.n===nkey(name)?v.l:'';}
 $('#rdmBtn').addEventListener('click',()=>{const b=$('#rdmBox');b.hidden=!b.hidden;if(!b.hidden)$('#rdmIn').focus();});
 $('#rdmGo').addEventListener('click',redeem);$('#rdmIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();redeem();}});
 /* browsers that support it offer "Install": the site then opens full screen from a home-screen icon, like an app */
