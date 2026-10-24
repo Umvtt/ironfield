@@ -115,7 +115,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
   </section>
   <section class="card" data-pane="badges" hidden>
     <div class="row" style="justify-content:space-between"><h2>Badges given out</h2><button class="ghost small" id="bRefresh" type="button">Refresh</button></div>
-    <p>A badge shows only next to the callsign it was redeemed with. Take one back and it disappears from that player's name.</p>
+    <p>A badge shows only next to its callsign, and nobody else can use that callsign. Change name moves it; Take back frees it.</p>
     <div class="list" id="bList"></div>
     <div class="msg" id="bMsg"></div>
   </section>
@@ -210,7 +210,7 @@ $('#cfgSave').onclick=async()=>{const cfg={news:{on:$('#nOn').checked,text:$('#n
     maint:{on:$('#mOn').checked,text:$('#mText').value.trim()},minBuild:Math.max(0,Math.round(+$('#minB').value||0))};
   const cur=+$('#curB').textContent||0;if(cfg.minBuild&&cur&&cfg.minBuild>cur)return say('#cfgMsg','The oldest build allowed can\'t be newer than the newest build ('+cur+').','bad');
   if(cfg.maint.on&&!confirm('Turn on maintenance? Nobody will be able to host or join co-op until you turn it off.'))return;
-  say('#cfgMsg','Saving…');try{await admin('cfgset',[],cfg);say('#cfgMsg','Live. Players see it within about 5 minutes (or when they reload).','ok');}catch(e){say('#cfgMsg','Not saved: '+e.message,'bad');}};
+  say('#cfgMsg','Saving…');try{const j=await admin('cfgset',[],cfg);say('#cfgMsg','Live now: sent to '+(j.live||0)+' open game'+(j.live===1?'':'s')+'. Everyone else gets it when they open the game.','ok');}catch(e){say('#cfgMsg','Not saved: '+e.message,'bad');}};
 let VEH={};
 fetch('index.html',{cache:'no-store'}).then(r=>r.text()).then(src=>{const re=/\b([VA])\('(usa|ger|ussr|uk|fra)','(\w+)',(\d),'(\w+)','((?:[^'\\]|\\.)*)',\{([^\n]*)/g;let m;const list=[];
   while((m=re.exec(src)))if(!/\badmin:1/.test(m[7]))list.push({id:m[5],name:m[6].replace(/\\'/g,"'"),nat:m[2],cls:m[3],tier:+m[4]});
@@ -260,7 +260,7 @@ const GONE=new Map();
 async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.filter(([id])=>!(Date.now()-(GONE.get(id)||0)<90e3)).sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
     for(const[id,b]of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[['★ '+b.label,'k'],[b.name||'(no name)','c'],[when(b.made),'d'],['code '+b.code,'d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}
       const gap=document.createElement('span');gap.className='sp';it.append(gap);const x=document.createElement('button');x.type='button';x.className='danger small';x.textContent='Take back';
-      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};it.append(x);box.append(it);}
+      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Change name';rn.onclick=async()=>{const nn=(prompt('New callsign for this badge (max 16 characters):',b.name||'')||'').trim().slice(0,16);if(!nn||nn===b.name)return;try{await admin('rebadge',[id],{name:nn});b.name=nn;say('#bMsg','Name changed to '+nn+'.','ok');loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};it.append(rn,x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
 $('#bRefresh').onclick=loadBadges;
 show(load().ct?'#lock':'#setup');

@@ -112,6 +112,8 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
 .report b{font-family:var(--mono);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--khaki)}
 .report b.rp{color:var(--signal)}
 .note{font-size:15px;color:var(--dim);margin:0;max-width:62ch;line-height:1.4}
+#liveNote{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9;width:max-content;max-width:min(560px,calc(100vw - 32px));background:rgba(16,19,13,.94);border:1px solid var(--signal);border-left-width:3px;color:var(--khaki);padding:8px 12px;font-size:15px;line-height:1.35;border-radius:3px;pointer-events:none;overflow-wrap:anywhere}
+#liveNote b{color:var(--signal)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:9;background:var(--signal);color:var(--ink);font-family:var(--mono);font-size:13px;font-weight:600;padding:9px 14px;border-radius:2px;max-width:calc(100% - 32px)}
 #safe{position:fixed;inset:0;pointer-events:none;visibility:hidden;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 #touch{position:fixed;inset:0;pointer-events:none;z-index:3}
@@ -231,6 +233,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
 </div>
 <form id="chatBar" class="float" hidden autocomplete="off"><input class="field" id="chatBarIn" maxlength="120" placeholder="Message your teammate (Enter sends, Esc closes)" aria-label="Chat message" enterkeyhint="send"><button class="btn small" type="submit">Send</button></form>
 <div id="toast" hidden></div>
+<div id="liveNote" hidden role="status"></div>
 <div id="breakPanel" class="float" hidden>
   <div class="bp-text"><span class="tag" id="bpTag">Wave cleared</span><b id="bpTitle">Start the next wave?</b><span id="bpVotes"></span></div>
   <div class="row"><button class="btn small" id="voteBtn" type="button">Start wave</button><button class="btn ghost small" id="swapBtn" type="button">Change tank</button><button class="btn ghost small" id="benchBtn" type="button" hidden>Hangar</button></div>
@@ -2044,16 +2047,42 @@ async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase()
       done.push((cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op');}}
   $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent=done.join(' · ')||'Done';fixSel();renderHangar();coopUI();if(net.mode==='host')sendLobby(true);}
 /* live settings from the server (news, RP events, maintenance, oldest build allowed), refreshed every 5 minutes */
-let LIVE={news:{on:false,text:''},rp:{mul:1,until:0},maint:{on:false,text:''},minBuild:0};
+let LIVE={news:{on:false,text:''},rp:{mul:1,until:0},maint:{on:false,text:''},minBuild:0,names:new Set()};
 const liveTxt=(v,n)=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,' ').slice(0,n);
 function rpMul(){const r=LIVE.rp;return r.mul>1&&(!r.until||Date.now()<r.until)?r.mul:1;}
-async function liveCfg(){const api=await codeAPI();if(!api)return;try{const r=await fetch(api+'/config',{cache:'no-store'});const c=r.ok?await r.json():null;if(!c||typeof c!=='object')return;
-    const n=c.news||{},rp=c.rp||{},m=c.maint||{};
-    LIVE={news:{on:!!n.on,text:liveTxt(n.text,300)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6))};}
-  catch(e){return;}renderLive();
-  if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
-    let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
-    if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}else showUpdateBar(b);}}
+async function liveCfg(){const api=await codeAPI();if(!api)return;try{const r=await fetch(api+'/config',{cache:'no-store'});const c=r.ok?await r.json():null;if(c&&typeof c==='object')applyLive(c);}catch(e){}}
+/* settings arrive here from the 5-minute check or, instantly, from the server's live connection; changes after the
+   first load are also announced over the battle */
+let liveSeen=false;
+function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LIVE;
+  LIVE={news:{on:!!n.on,text:liveTxt(n.text,300)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6)),
+    names:new Set((Array.isArray(c.names)?c.names:[]).slice(0,500).map(x=>cleanName(x).toLowerCase()).filter(Boolean))};
+  renderLive();lockNames();
+  if(liveSeen){const notes=[],nm=rpMul(),om=old.rp.mul>1&&(!old.rp.until||Date.now()<old.rp.until)?old.rp.mul:1;
+    if(LIVE.news.on&&LIVE.news.text&&(!old.news.on||old.news.text!==LIVE.news.text))notes.push(['News',LIVE.news.text]);
+    if(nm!==om)notes.push(nm>1?[(nm===2?'Double':nm===3?'Triple':nm+'×')+' RP','event started: kills and waves pay more']:['RP event','has ended']);
+    if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
+    if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
+    if(notes.length)liveNote(notes);}
+  liveSeen=true;
+  if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild)needUpdate();}
+async function needUpdate(){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
+  let tried='';try{tried=sessionStorage.getItem('ironfield-minb')||'';}catch(e){}
+  if(state==='hangar'&&net.mode==='off'&&tried!==b){try{sessionStorage.setItem('ironfield-minb',b);}catch(e){}reloadNewest(b);}
+  else{showUpdateBar(b);if(state!=='hangar')liveNote([['Update',(net.mode!=='off'?'a required update is out: it installs when you leave the room.':'a required update is out: it installs when you go back to the hangar.')]]);}}
+let liveNoteT=0;
+function liveNote(rows){const el=$('#liveNote');if(!el)return;el.textContent='';
+  for(const[h,t]of rows){const d=document.createElement('div'),b=document.createElement('b');b.textContent=h+' ';d.append(b,document.createTextNode(t));el.append(d);if(state!=='hangar')log(h+': '+t,'#f2a23a');}
+  el.hidden=false;clearTimeout(liveNoteT);liveNoteT=setTimeout(()=>{el.hidden=true;},state==='hangar'?6000:10000);sfx.ping&&sfx.ping();}
+/* the live connection: one WebSocket to the server, which pushes new settings the moment they are saved */
+let liveWs=null,liveTry=0,livePing=0;
+async function liveConnect(){const api=await codeAPI();if(!api||!('WebSocket' in window)||(liveWs&&liveWs.readyState<2))return;
+  let ws;try{ws=new WebSocket(api.replace(/^https:/,'wss:')+'/live');}catch(e){liveRetry();return;}liveWs=ws;
+  ws.onopen=()=>{liveTry=0;clearInterval(livePing);livePing=setInterval(()=>{try{ws.send('ping');}catch(e){}},45000);};
+  ws.onmessage=e=>{if(typeof e.data!=='string'||e.data.length>6000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(d&&d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);};
+  ws.onclose=()=>{clearInterval(livePing);if(liveWs===ws)liveWs=null;liveRetry();};}
+function liveRetry(){liveTry++;setTimeout(()=>{if(!document.hidden)liveConnect();},Math.min(60000,2000*2**Math.min(liveTry,5))+Math.random()*2000);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!liveWs)liveConnect();});
 function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';const add=(t,c)=>{const p=document.createElement('p');p.textContent=t;if(c)p.className=c;el.append(p);};
   if(LIVE.news.on&&LIVE.news.text)add(LIVE.news.text);
   const m=rpMul();if(m>1)add((m===2?'Double':m===3?'Triple':m+'×')+' RP event'+(LIVE.rp.until?' · until '+new Date(LIVE.rp.until).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}):''),'ev');
@@ -2061,9 +2090,22 @@ function renderLive(){const el=$('#liveBar');if(!el)return;el.textContent='';con
   el.hidden=!el.childNodes.length;}
 /* badges: checked with the server, shown only under the callsign they belong to */
 const BADGE=new Map();
-function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BADGE.has(tk)))].slice(0,20);if(!need.length)return;for(const tk of need)BADGE.set(tk,null);
+function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BADGE.has(tk)))].slice(0,20);if(!need.length)return;for(const tk of need)BADGE.set(tk,'p');
   codeCall('/badge',{tks:need}).then(r=>{if(!r||!r.ok||!r.labels||typeof r.labels!=='object'){for(const tk of need)BADGE.delete(tk);return;}
-    for(const tk of need){const v=r.labels[tk];BADGE.set(tk,v&&typeof v==='object'?{l:cleanName(v.l),n:cleanName(v.n).toLowerCase()}:null);}renderSquad();renderChat();});}
+    for(const tk of need){const v=r.labels[tk];BADGE.set(tk,v&&typeof v==='object'?{l:cleanName(v.l),n:cleanName(v.n).toLowerCase()}:null);}lockNames();renderSquad();renderChat();});}
+/* a badge's callsign is locked: nobody else may use it (the owner can move it in the panel) */
+const nameLocked=n=>!!n&&LIVE.names.has(String(n).toLowerCase());
+const ownsName=(tk,n)=>{const v=tk&&BADGE.get(tk);return!!(v&&v.n&&v.n===String(n).toLowerCase());};
+const nameOk=(tk,n)=>!nameLocked(n)||ownsName(tk,n);
+function hostName(pe,n){if(!n||nameOk(pe.bt,n)){pe.wantName=null;return n;}
+  if(pe.bt&&BADGE.get(pe.bt)==='p')pe.wantName=n;else sendTo(pe,{e:'sys',text:n+' is a locked callsign: pick another one'});return pe.name||'Guest '+pe.pid.slice(1);}
+function lockNames(){
+  if(nameLocked(store.name)&&!ownsName(store.badge,store.name)&&!(store.badge&&BADGE.get(store.badge)==='p')){store.name='Tanker-'+(100+Math.floor(Math.random()*900));persist();if(nameIn)nameIn.value=store.name;
+    toast('Your callsign is now locked to a badge holder, so it was changed');if(net.connected)netSend({e:'name',name:store.name});renderSquad();}
+  if(net.mode!=='host')return;let ch=false;
+  for(const pe of peerList()){if(pe.wantName&&ownsName(pe.bt,pe.wantName)){pe.name=pe.wantName;pe.wantName=null;ch=true;}
+    else if(pe.name&&!nameOk(pe.bt,pe.name)&&BADGE.get(pe.bt)!=='p'){pe.name='Guest '+pe.pid.slice(1);sendTo(pe,{e:'sys',text:'Your callsign is locked to a badge holder: pick another one'});ch=true;}}
+  if(ch){net.lobbyKey='';sendLobby(true);coopUI();}}
 function badgeTkOf(name){if(!name)return '';const lo=String(name).toLowerCase();
   if(net.mode==='guest'){const r=net.squad.find(r=>r[0].toLowerCase()===lo);return r&&r[4]||'';}
   if(lo===store.name.toLowerCase())return store.badge;const pe=net.mode==='host'?peerList().find(p=>(p.name||'').toLowerCase()===lo):null;return pe&&pe.btOk||'';}
@@ -2094,8 +2136,8 @@ function renderSlots(){const box=$('#slots');box.textContent='';
     else sub.textContent='Starts at 0 RP with the tier I tanks';
     b.append(tag,big,sub);b.addEventListener('click',()=>pickSlot(i));box.append(b);}}
 const nameIn=$('#nameIn');nameIn.value=store.name;
-nameIn.addEventListener('input',()=>{const v=cleanName(nameIn.value);if(v){store.name=v;persist();renderSquad();}});
-nameIn.addEventListener('change',()=>{const v=cleanName(nameIn.value);if(v)store.name=v;nameIn.value=store.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();});
+nameIn.addEventListener('input',()=>{const v=cleanName(nameIn.value);if(v&&nameOk(store.badge,v)){store.name=v;persist();renderSquad();}});
+nameIn.addEventListener('change',()=>{const v=cleanName(nameIn.value);if(v&&!nameOk(store.badge,v))toast('That callsign is locked to a badge holder');else if(v)store.name=v;nameIn.value=store.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();});
 nameIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();nameIn.blur();}});
 
 /* guests research at once on their own room profile; the host applies the same to its copy (pe.rp/pe.mine) */
@@ -2809,7 +2851,7 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
-liveCfg();setInterval(liveCfg,300000);checkBadges([store.badge]);
+liveCfg().then(liveConnect);setInterval(liveCfg,300000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   if(!MP_OK){coopStatus(MP_NO,true);return;}await liveCfg();if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}if(!await ensureFresh())return;
@@ -2833,7 +2875,7 @@ function hostData(pe,d){
   if(d.e==='ping'){sendTo(pe,{e:'pong',t:num(d.t,0,1e15)});return;}
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)pe.rtt=pe.rtt?pe.rtt*.6+r*.4:r;return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
-    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;pe.tank=T&&(!T.admin||pe.perkAll)?d.tank:'m4a1';const n=cleanName(d.name);pe.name=n||pe.name||'Guest '+pe.pid.slice(1);pe.bt=cleanBt(d.bt);checkBadges([pe.bt]);
+    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;pe.tank=T&&(!T.admin||pe.perkAll)?d.tank:'m4a1';pe.bt=cleanBt(d.bt);checkBadges([pe.bt]);const n=hostName(pe,cleanName(d.name));pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
     if(first){pe.rp=0;pe.mine=new Set(net.left&&net.left[pe.name.toLowerCase()]||[]);sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');sfx.ping();}
     net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o,mn:!!d.mn};return;}
@@ -2845,7 +2887,7 @@ function hostData(pe,d){
   if(d.e==='swap'){const T=tget(d.tank);if(T&&T.admin&&!pe.perkAll)pe.wantTank=d.tank;if(T&&(!T.admin||pe.perkAll)){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
   if(d.e==='chat'){if(!rateOk(pe.chatIn,5000,6))return;const t=cleanText(d.text);if(!t)return;const who=pe.name||'Guest';addChat(who,t,'them');sfx.ping();
     const j=JSON.stringify({e:'chat',from:who,text:t});for(const o of peerList())if(o!==pe)sendTo(o,j);return;}
-  if(d.e==='name'){const n=cleanName(d.name);if(!n||n===pe.name)return;const old=pe.name;pe.name=n;if(old)sysAll(old+' is now '+n);net.lobbyKey='';sendLobby(true);coopUI();return;}
+  if(d.e==='name'){const n=hostName(pe,cleanName(d.name));if(!n||n===pe.name)return;const old=pe.name;pe.name=n;if(old)sysAll(old+' is now '+n);net.lobbyKey='';sendLobby(true);coopUI();return;}
 }
 function spawnPeerTank(pe,x,y,a){const T=tget(pe.tank);if(!T||(T.admin&&!pe.perkAll))return null;const t=makeTank(T,x,y,'p');t.a=a;t.aimAt=a;t.peer=pe;pe.t=t;pe.stats=pe.stats||newStats();t.stats=pe.stats;pe.input=null;pe.lastClicks=undefined;pe.lastPicks=undefined;pe.deathCause='';tanks.push(t);return t;}
 function sendStart(pe){if(!pe.t||!player)return;const have=new Set(obs.map(o=>o.id)),gone=[];for(let i=0;i<obsTotal;i++)if(!have.has(i))gone.push(i);
