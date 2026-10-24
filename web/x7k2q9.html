@@ -42,6 +42,8 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
 .item .sp{flex:1}
 .st-ready{color:var(--ok)}.st-done,.st-exp{color:var(--dim)}.st-off{color:var(--bad)}
 .abs{display:flex;flex-direction:column;gap:6px}.chip{font-size:12px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--text)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:10px 12px}.switch b{color:var(--text)}.switch p{margin:2px 0 0}
+.netbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#3a1f1b;border:1px solid var(--bad);border-radius:3px;padding:10px 12px;color:var(--text)}
 .meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .2s}
 [hidden]{display:none!important}
 </style>
@@ -107,8 +109,8 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <div class="row"><button id="kGo" type="button">Make the code</button></div>
     <div class="row"><span class="code" id="kCode">—</span><button class="ghost small" id="kCopy" type="button" hidden>Copy</button></div>
     <div class="msg" id="kMsg"></div>
-    <div class="row" style="justify-content:space-between"><h2>Your codes</h2>
-      <span class="row"><button class="ghost small" id="cRefresh" type="button">Refresh</button><button class="ghost small" id="allBtn" type="button">All codes: …</button></span></div>
+    <div class="switch"><div><b>Redeeming codes</b><p id="allTxt">…</p></div><button type="button" id="allBtn">…</button></div>
+    <div class="row" style="justify-content:space-between"><h2>Your codes</h2><button class="ghost small" id="cRefresh" type="button">Refresh</button></div>
     <div class="list" id="cList"></div>
     <div class="row"><button class="ghost small" id="cDelDone" type="button">Delete used-up codes</button><button class="ghost small" id="cDelExp" type="button">Delete expired codes</button><button class="danger small" id="cDelUnused" type="button">Delete all unused codes</button></div>
     <div class="msg" id="cMsg"></div>
@@ -169,10 +171,15 @@ const codeOf=async id=>id+'S'+b32(await sign('code:'+id+'S'),8);
 async function admin(action,ids=[],data,key,url){const ts=Date.now(),ds=data===undefined?null:JSON.stringify(data);
   const sig=hex(await sign('admin:'+ts+':'+action+':'+ids.join(',')+(ds!==null?':'+ds:''),key));
   const body={ts,action,ids,sig};if(ds!==null)body.data=ds;
-  let r=null;for(let i=0;i<3&&!r;i++){try{r=await fetch((url||URL0).replace(/\/$/,'')+'/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});}catch(e){if(i<2)await new Promise(f=>setTimeout(f,700*(i+1)));}}
-  if(!r)throw new Error('can\'t reach the server. Check your internet and try again');
+  let r=null;const wait=[400,1000,2000,4000];for(let i=0;i<5&&!r;i++){try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),9000);r=await fetch((url||URL0).replace(/\/$/,'')+'/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store',signal:ac.signal});clearTimeout(to);}catch(e){if(i<4)await new Promise(f=>setTimeout(f,wait[i]));}}
+  if(!r){netDown();throw new Error('no connection to the server');}netUp();
   const j=await r.json().catch(()=>({ok:false,reason:'reply'}));if(!j.ok)throw new Error(WHY[j.reason]||j.reason||'error');return j;}
 const WHY={auth:'the server refused the key (or this device\'s clock is off by more than 5 minutes)',replay:'that request was already sent; try again',busy:'the server is busy; try again in a moment',server:'the server hit an error; try again',reply:'the server sent a broken reply; try again',exists:'that code already exists; make another',kind:'unknown code type',gone:'that badge no longer exists',name:'a callsign is needed',data:'bad data',setup:'the server is not set up'};
+function netDown(){let b=$('#netbar');if(!b){b=document.createElement('div');b.id='netbar';b.className='netbar';const t=document.createElement('span');t.id='netTxt';const k=document.createElement('button');k.type='button';k.className='small';k.textContent='Try again';
+    k.onclick=()=>{netUp();const tab=(document.querySelector('.tabs button[aria-selected=true]')||{}).dataset;openTab(tab&&tab.tab||'live');loadStat();};b.append(t,k);$('#app').prepend(b);}
+  $('#netTxt').textContent=navigator.onLine===false?'This device is offline. Reconnect, then try again.':'Can\'t reach the server from this network right now (tried 5 times). Usually it\'s a short drop; if it keeps happening, an ad blocker, VPN or private DNS on this device may be blocking workers.dev.';b.hidden=false;}
+function netUp(){const b=$('#netbar');if(b)b.hidden=true;}
+addEventListener('online',()=>{if(KEY){netUp();loadStat();}});
 function show(id){for(const s of['#setup','#lock','#app'])$(s).hidden=s!==id;if(id==='#lock')lockTimer();}
 function lock(){KEY=null;URL0='';for(const e of document.querySelectorAll('#app input,#app textarea'))if(e.type==='password')e.value='';$('#kCode').textContent='—';$('#kCopy').hidden=true;show('#lock');$('#lPw').focus();}
 function lockTimer(){const st=load(),left=Math.max(0,(st.until||0)-Date.now());$('#lGo').disabled=left>0;
@@ -251,7 +258,7 @@ const stTxt={ready:'ready',done:'used up',exp:'expired',off:'switched off'};
 async function loadCodes(){say('#cMsg','Loading…');try{const j=await admin('list');
     CODES=j.codes.sort((a,b)=>(b[1].made||0)-(a[1].made||0));allOn=j.all;await renderCodes();say('#cMsg',CODES.length?'':'No codes yet.');}
   catch(e){say('#cMsg','Could not load: '+e.message,'bad');}}
-async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn').textContent='All codes: '+(allOn?'ON':'OFF');
+async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn').textContent=allOn?'Turn all codes off':'Turn all codes on';$('#allBtn').className=allOn?'danger':'';$('#allTxt').textContent=allOn?'On: codes can be redeemed.':'Off: nobody can redeem any code right now.';$('#allTxt').style.color=allOn?'var(--ok)':'var(--bad)';
   for(const[id,r]of CODES){const st=stOf(r),it=document.createElement('div');it.className='item';
     const sp=(t,c)=>{const e=document.createElement('span');e.textContent=t;if(c)e.className=c;it.append(e);return e;};
     const code=await codeOf(id);sp(fmtCode(code),'c');sp(gives(r),'k');sp(r.n+' / '+r.uses+' used','d');if(r.exp)sp('ends '+when(r.exp),'d');if(r.note)sp(r.note,'d');sp(stTxt[st],'st-'+st);

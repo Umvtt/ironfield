@@ -2095,7 +2095,9 @@ new MutationObserver(ms=>{if(tring)return;tring=true;for(const m of ms){if(m.typ
 $('#langSel').addEventListener('change',e=>setLang(e.target.value));setLang(lang);
 let codeApi=null;
 async function codeAPI(){if(codeApi!==null)return codeApi;try{const r=await fetch('codes.json?t='+Date.now(),{cache:'no-store'});const c=r.ok?await r.json():null;codeApi=c&&typeof c.api==='string'&&/^https:\/\/[a-z0-9.-]+(\/[a-z0-9._-]*)?$/i.test(c.api)?c.api.replace(/\/$/,''):'';}catch(e){codeApi='';}return codeApi;}
-async function codeCall(path,body){const api=await codeAPI();if(!api)return{ok:false,reason:'setup'};try{const r=await fetch(api+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return await r.json();}catch(e){return{ok:false,reason:'net'};}}
+async function codeCall(path,body){const api=await codeAPI();if(!api)return{ok:false,reason:'setup'};
+  for(let i=0;i<4;i++){try{const r=await fetch(api+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});return await r.json();}catch(e){if(i<3)await new Promise(f=>setTimeout(f,[400,1200,2500][i]));}}
+  return{ok:false,reason:'net'};}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
 async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
   const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name});
