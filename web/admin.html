@@ -250,13 +250,16 @@ $('#kGo').onclick=async()=>{const k=$('#kKind').value,d={k,uses:Math.max(1,Math.
   if(k==='badge'){d.v=$('#kBadge').value.trim();if(!d.v)return say('#kMsg','Write the badge text.','bad');}
   if(d.exp&&d.exp<Date.now())return say('#kMsg','The expiry date is in the past.','bad');
   const r=crypto.getRandomValues(new Uint32Array(6));let id='';for(const v of r)id+=A[v%32];
-  say('#kMsg','Making…');try{await admin('mk',[id],d);const c=await codeOf(id);$('#kCode').textContent=fmtCode(c);$('#kCopy').hidden=false;
+  say('#kMsg','Making…');try{await admin('mk',[id],d);fresh(id,Object.assign({},d,{v:d.v??'',n:0,off:false,made:Date.now()}));const c=await codeOf(id);$('#kCode').textContent=fmtCode(c);$('#kCopy').hidden=false;
     say('#kMsg','Give this to '+(d.uses>1?'up to '+d.uses+' people':'one person')+'. It works '+(d.uses>1?'once per device':'once')+'.','ok');loadCodes();}catch(e){say('#kMsg','Not made: '+e.message,'bad');}};
 $('#kCopy').onclick=()=>navigator.clipboard.writeText($('#kCode').textContent).then(()=>say('#kMsg','Copied.','ok'),()=>say('#kMsg','Copy did not work: select the code and copy it by hand.','bad'));
 let CODES=[],allOn=true;
+/* the server's list can lag up to a minute behind a change, so changes made here are laid over it for 90 s */
+const OVER=new Map(),fresh=(id,r,x)=>OVER.set(id,Object.assign({r,t:Date.now()},x));
 const stOf=r=>r.off?'off':r.n>=r.uses?'done':r.exp&&Date.now()>r.exp?'exp':'ready';
 const stTxt={ready:'ready',done:'used up',exp:'expired',off:'switched off'};
-async function loadCodes(){say('#cMsg','Loading…');try{const j=await admin('list');CODES=j.codes.sort((a,b)=>(b[1].made||0)-(a[1].made||0));allOn=j.all;await renderCodes();say('#cMsg',CODES.length?'':'No codes yet.');}
+async function loadCodes(){say('#cMsg','Loading…');try{const j=await admin('list'),m=new Map(j.codes);for(const[id,o]of OVER){if(Date.now()-o.t>90e3){OVER.delete(id);continue;}if(!o.r)m.delete(id);else if(!m.has(id))m.set(id,o.r);else if('off' in o)m.set(id,Object.assign({},m.get(id),{off:o.off}));}
+    CODES=[...m].sort((a,b)=>(b[1].made||0)-(a[1].made||0));allOn=j.all;await renderCodes();say('#cMsg',CODES.length?'':'No codes yet.');}
   catch(e){say('#cMsg','Could not load: '+e.message,'bad');}}
 async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn').textContent='All codes: '+(allOn?'ON':'OFF');
   for(const[id,r]of CODES){const st=stOf(r),it=document.createElement('div');it.className='item';
@@ -265,13 +268,13 @@ async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn
     const gap=document.createElement('span');gap.className='sp';it.append(gap);
     const btn=(t,f,cls)=>{const b=document.createElement('button');b.type='button';b.className=(cls||'ghost')+' small';b.textContent=t;b.onclick=f;it.append(b);};
     btn('Copy',()=>navigator.clipboard.writeText(fmtCode(code)).then(()=>say('#cMsg','Copied '+fmtCode(code)+'.','ok'),()=>{}));
-    if(st==='ready'||st==='off')btn(r.off?'Turn on':'Turn off',async()=>{try{await admin('set',[id],{off:!r.off});loadCodes();}catch(e){say('#cMsg',e.message,'bad');}});
-    btn('Delete',async()=>{if(!confirm('Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
+    if(st==='ready'||st==='off')btn(r.off?'Turn on':'Turn off',async()=>{try{await admin('set',[id],{off:!r.off});fresh(id,Object.assign({},r,{off:!r.off}),{off:!r.off});loadCodes();}catch(e){say('#cMsg',e.message,'bad');}});
+    btn('Delete',async()=>{if(!confirm('Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);fresh(id,null);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
     box.append(it);}}
 $('#cRefresh').onclick=loadCodes;
 $('#allBtn').onclick=async()=>{if(allOn&&!confirm('Switch every code off? Nobody can redeem anything until you switch them back on.'))return;try{await admin(allOn?'alloff':'allon');loadCodes();}catch(e){say('#cMsg',e.message,'bad');}};
 async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))).map(c=>c[0]);if(!ids.length)return say('#cMsg','No '+what+' codes.');
-  if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
+  if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));for(const id of ids)fresh(id,null);await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
 $('#cDelDone').onclick=()=>delWhere(s=>s==='done','used-up');
 $('#cDelExp').onclick=()=>delWhere(s=>s==='exp','expired');
 /* ---- redeem log & badges ---- */
@@ -279,10 +282,11 @@ async function loadLog(){say('#gMsg','Loading…');try{const L=(await admin('log
     for(const x of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[[when(x.t),'d'],[x.id,'c'],[String(x.p||'').replace(/^rp:(\d+)/,(m,n)=>(+n).toLocaleString()+' RP').replace(/^veh:(\w+)/,(m,v)=>VEH[v]||v).replace('all_vehicles','Every vehicle').replace('badge','Badge'),'k'],[x.name||'(no name)','d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}box.append(it);}
     say('#gMsg',L.length?'':'Nobody has redeemed a code yet.');}catch(e){say('#gMsg','Could not load: '+e.message,'bad');}}
 $('#gRefresh').onclick=loadLog;
-async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
+const GONE=new Map();
+async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.filter(([id])=>!(Date.now()-(GONE.get(id)||0)<90e3)).sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
     for(const[id,b]of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[['★ '+b.label,'k'],[b.name||'(no name)','c'],[when(b.made),'d'],['code '+b.code,'d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}
       const gap=document.createElement('span');gap.className='sp';it.append(gap);const x=document.createElement('button');x.type='button';x.className='danger small';x.textContent='Take back';
-      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};it.append(x);box.append(it);}
+      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);GONE.set(id,Date.now());loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};it.append(x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
 $('#bRefresh').onclick=loadBadges;
 show(load().ct?'#lock':'#setup');
