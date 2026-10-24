@@ -286,7 +286,7 @@ async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('
       x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};chips(it,b.ab);const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Edit';rn.onclick=()=>edit('badge',id,b.name,b.label,b.ab,()=>{loadBadges();say('#bMsg','Saved: the change reaches their game right away.','ok');});it.append(rn,x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
 $('#bRefresh').onclick=loadBadges;
-async function loadStat(){if(!KEY)return;try{const[o,c]=await Promise.all([admin('online'),admin('cfgget')]),x=c.cfg,el=$('#stat');el.textContent='';
+async function loadStat(){if(!KEY)return;try{const[o,c,l]=await Promise.all([admin('online'),admin('cfgget'),admin('list')]),x=c.cfg,el=$('#stat');allOn=l.all;el.textContent='';
     const add=(t,ok)=>{const e=document.createElement('span');e.textContent=t;if(ok!==undefined)e.style.color=ok?'var(--ok)':'var(--bad)';el.append(e);};
     add('● '+o.n+' game'+(o.n===1?'':'s')+' open now',true);add('Codes '+(allOn?'on':'off'),allOn);if(x.news.on)add('News on');if(x.rp.mul>1)add(x.rp.mul+'× RP');if(x.maint.on)add('Maintenance on',false);}catch(e){}}
 setInterval(()=>{if(KEY&&!document.hidden)loadStat();},30000);
