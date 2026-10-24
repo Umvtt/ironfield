@@ -2136,12 +2136,12 @@ async function liveCfg(){const L=await codeAPIs();for(let i=0;i<L.length;i++){co
    first load are also announced over the battle */
 let liveSeen=false;
 function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LIVE;
-  LIVE={news:{on:!!n.on,text:liveTxt(n.text,300)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6)),
+  LIVE={news:{on:!!n.on,text:liveTxt(n.text,300),id:liveTxt(n.id,20)},rp:{mul:[1,1.5,2,3].includes(+rp.mul)?+rp.mul:1,until:Math.round(num(rp.until,0,1e14))},maint:{on:!!m.on,text:liveTxt(m.text,200)},minBuild:Math.round(num(c.minBuild,0,1e6)),
     names:new Set((Array.isArray(c.names)?c.names:[]).slice(0,500).map(x=>nkey(cleanName(x))).filter(Boolean)),bv:Math.round(num(c.bv,0,1e14))};
   renderLive();lockNames();
   if(liveSeen&&LIVE.bv!==old.bv){const tks=[store.badge].concat(peerList().map(p=>p.bt),net.squad.map(r=>r[4])).filter(Boolean);for(const tk of tks)BADGE.delete(tk);checkBadges(tks);}
   if(liveSeen){const notes=[],nm=rpMul(),om=old.rp.mul>1&&(!old.rp.until||Date.now()<old.rp.until)?old.rp.mul:1;
-    if(LIVE.news.on&&LIVE.news.text&&(!old.news.on||old.news.text!==LIVE.news.text))notes.push(['News',LIVE.news.text]);
+    if(LIVE.news.on&&LIVE.news.text&&(!old.news.on||old.news.text!==LIVE.news.text||old.news.id!==LIVE.news.id))notes.push(['News',LIVE.news.text]);
     if(nm!==om)notes.push(nm>1?[(nm===2?'Double':nm===3?'Triple':nm+'×')+' RP','event started: kills and waves pay more']:['RP event','has ended']);
     if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
     if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
@@ -2163,8 +2163,8 @@ function liveNote(rows){const el=$('#liveNote');if(!el)return;el.textContent='';
 let liveWs=null,liveTry=0,livePing=0;
 async function liveConnect(){const api=await codeAPI();if(!api||!('WebSocket' in window)||(liveWs&&liveWs.readyState<2))return;
   let ws;try{ws=new WebSocket(api.replace(/^https:/,'wss:')+'/live');}catch(e){liveRetry();return;}liveWs=ws;
-  ws.onopen=()=>{liveTry=0;ws.opened=1;clearInterval(livePing);livePing=setInterval(()=>{try{ws.send('ping');}catch(e){}},45000);};
-  ws.onmessage=e=>{if(typeof e.data!=='string'||e.data.length>6000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(d&&d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);};
+  ws.onopen=()=>{liveTry=0;ws.opened=1;ws.seen=Date.now();clearInterval(livePing);livePing=setInterval(()=>{if(Date.now()-ws.seen>100000){try{ws.close();}catch(e){}return;}try{ws.send('ping');}catch(e){}},45000);};
+  ws.onmessage=e=>{ws.seen=Date.now();if(typeof e.data!=='string'||e.data.length>6000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(d&&d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);};
   ws.onclose=()=>{clearInterval(livePing);if(liveWs===ws)liveWs=null;if(!ws.opened)apiNext();liveRetry();};}
 function liveRetry(){liveTry++;setTimeout(()=>{if(!document.hidden)liveConnect();},Math.min(60000,2000*2**Math.min(liveTry,5))+Math.random()*2000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!liveWs)liveConnect();});
@@ -2955,7 +2955,7 @@ function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
 let livePoll=Date.now();liveCfg().then(liveConnect);
-setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>300000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},15000);checkBadges([store.badge]);
+setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>60000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},15000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   /* the room shows up at once; the version check runs while the room opens (maintenance is already known from LIVE) */
