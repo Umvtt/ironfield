@@ -48,6 +48,7 @@ body.playing canvas#game{cursor:none}
 .news ul{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px;color:var(--khaki);font-size:15px;line-height:1.35}
 .news li{overflow-wrap:anywhere}
 .live-bar{border-left-color:var(--ok,#8bd66e)}.live-bar p{margin:0;color:var(--khaki);font-size:16px;line-height:1.35;overflow-wrap:anywhere}.live-bar p.ev{color:var(--signal);font-weight:600}.live-bar p.mt{color:#ee5d50}
+.my-bdg{display:block;font-size:15px;margin:4px 0 0}
 .bdg{color:var(--signal);font-size:12px;font-weight:600;margin-left:6px;white-space:nowrap}
 .build{align-self:flex-end;margin-top:-6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim);opacity:.7}
 .mast{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;border-bottom:2px solid var(--line);padding-bottom:12px}
@@ -250,7 +251,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
     <div class="mast">
       <h1>Ironfield</h1>
       <div class="bank">
-        <label class="callsign"><span class="tag">Callsign · shown above your vehicle</span><input class="field" id="nameIn" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Callsign"></label>
+        <label class="callsign"><span class="tag">Callsign · shown above your vehicle</span><input class="field" id="nameIn" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Callsign"></label><span class="bdg my-bdg" id="myBadge" hidden></span>
         <div><span class="tag" id="rpTag">Research points</span><b id="rpVal">0</b></div>
         <div><span class="tag">Best wave</span><b class="k" id="bestVal">–</b></div>
       </div>
@@ -2012,7 +2013,7 @@ pausedEl.addEventListener('pointerdown',e=>{if(e.target===pausedEl&&(state==='pa
 document.addEventListener('visibilitychange',()=>{releaseInputs();if(document.hidden){try{if(eng&&AC)eng.g.gain.setValueAtTime(0,AC.currentTime);}catch(e){}if(state==='play'&&net.mode==='off')togglePause();}else last=performance.now();});
 let lastListMode=null;window.addEventListener('resize',()=>{if(state==='hangar'&&(window.innerWidth<640)!==lastListMode)renderHangar();});
 if(COARSE)$('#keysLegend').innerHTML='<span>Left stick drives</span><span>Drag on the right half to aim (it locks on to enemies)</span><span>Hold FIRE to shoot</span><span>Tap your status box for full details</span><span>MAP shows the whole battlefield; tap it to aim there</span>';
-$('#adminBtn').addEventListener('click',()=>{if(coopProfile())return;save.owned=ROSTER.map(T=>T.id);persist();renderHangar();toast('Admin: all '+ROSTER.length+' vehicles unlocked, including every nation\'s admin vehicle');});
+$('#adminBtn').addEventListener('click',()=>{if(coopProfile()){if(myAb().has('admin')){PERK.all=true;toast('Every vehicle unlocked for this session by your badge');fixSel();renderHangar();}return;}save.owned=ROSTER.map(T=>T.id);persist();renderHangar();toast('Admin: all '+ROSTER.length+' vehicles unlocked, including every nation\'s admin vehicle');});
 /* "What's new": the deploy writes version.json with the commit's first line and its bullet list. A new version opens
    the full list once; after that it stays folded. Remote text only ever goes into textContent. */
 function showNews(info){if(!info||typeof info.notes!=='string'||!info.notes)return;const el=$('#news'),list=$('#newsList'),btn=$('#newsBtn');
@@ -2165,7 +2166,7 @@ function renderHangar(){
   $('#rpTag').textContent=net.mode==='guest'?'Your room research points':net.mode==='host'?'Research points · your slot '+(store.active+1):'Research points · slot '+(store.active+1);
   $('#modeSolo').setAttribute('aria-selected',String(!coop));$('#modeMp').setAttribute('aria-selected',String(coop));$('#modeSolo').setAttribute('aria-disabled',String(net.mode!=='off'));
   $('#soloPanel').hidden=coop;$('#mpPanel').hidden=!coop;if(!coop)renderSlots();
-  $('#adminBtn').hidden=coop;$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
+  $('#adminBtn').hidden=coop&&!myAb().has('admin');{const bd=badgeFor(store.name),el=$('#myBadge'),A={nuke:'nukes in co-op',admin:'every vehicle',kick:'can\'t be kicked',vote:'starts waves alone'};el.hidden=!bd;if(bd)el.textContent='★ '+bd+' badge'+(myAb().size?' · '+[...myAb()].map(x=>A[x]).join(', '):'');}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
   if(net.mode==='host'&&net.connected)sendLobby();
   $('#tabs').innerHTML=NATIONS.map(n=>'<button class="tab" type="button" role="tab" id="tab-'+n.id+'" data-n="'+n.id+'" aria-selected="'+(n.id===save.nation)+'">'+flagImg(n.id)+n.name+'</button>').join('');
   if(TYPE[viewId]&&(TYPE[viewId].air?'air':'ground')!==treeDom)treeDom=TYPE[viewId].air?'air':'ground';
