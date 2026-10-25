@@ -296,7 +296,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
         <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">Needs an account. Everyone in the room plays on a copy of the save you pick. Only your own progress is kept.</p><div class="row"><select class="field" id="hostSave" aria-label="Save for this room"></select><button class="btn small" id="hostBtn" type="button">Create room</button></div><label class="setting"><input type="checkbox" id="pubRoom"> <span>Show my room in the open rooms list</span></label></div>
         <div class="mp-card"><span class="tag">Join</span><h3>Enter a room code</h3><div class="row"><input class="field" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code" enterkeyhint="go"><button class="btn small" id="joinBtn" type="button">Join</button></div><span class="why" id="joinHint">Codes are 6 letters and digits, like K7M2QX.</span></div>
       </div>
-      <div class="mp-card rooms" id="roomsCard"><span class="tag">Open rooms</span><div id="roomList" class="room-list"><p class="why">Looking for rooms…</p></div></div>
+      <div class="mp-card rooms" id="roomsCard"><span class="tag">Open rooms</span><input class="field" id="roomFind" maxlength="16" placeholder="Search by host callsign" autocomplete="off" aria-label="Search rooms" style="margin-top:8px"><div id="roomList" class="room-list"><p class="why">Looking for rooms…</p></div></div>
       <div id="coopOn" hidden>
         <div class="room-head">
           <div><span class="tag" id="roomTag">Room code</span><span class="code" id="roomCode"></span></div>
@@ -1124,7 +1124,7 @@ const cleanBt=v=>typeof v==='string'&&/^[A-Z2-9]{10}\.[A-Z2-9]{12}$/.test(v)?v:'
 try{
   const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
   if(raw&&Array.isArray(raw.slots)){store.active=clamp(Math.round(+raw.active||0),0,SLOTS-1);store.slots=[0,1,2].map(i=>raw.slots[i]?normSave(raw.slots[i]):null);
-    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.noHull=raw.noHull?1:0;store.newsSeen=String(raw.newsSeen||'').slice(0,320);store.pub=raw.pub===0?0:1;store.ban=String(raw.ban||'').slice(0,120);const ac=raw.acct;store.acct=ac&&typeof ac==='object'&&/^[a-f0-9]{64}$/.test(ac.tk)?{tk:ac.tk,id:String(ac.id||'').replace(/[^A-Z2-9]/g,'').slice(0,12),name:cleanName(ac.name),rev:Math.round(+ac.rev||0),dirty:ac.dirty?1:0}:null;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
+    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.noHull=raw.noHull?1:0;store.newsSeen=String(raw.newsSeen||'').slice(0,320);store.pub=raw.pub===0?0:1;store.ban=String(raw.ban||'').slice(0,120);const ac=raw.acct;store.acct=ac&&typeof ac==='object'&&/^[a-f0-9]{64}$/.test(ac.tk)?{tk:ac.tk,id:String(ac.id||'').replace(/[^A-Z2-9]/g,'').slice(0,12),name:cleanName(ac.name),rev:Math.round(+ac.rev||0),dirty:ac.dirty?1:0,nt:String(ac.nt||'').replace(/[^a-f0-9]/g,'').slice(0,24)}:null;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
   else{/* first run of this version: the old single save becomes slot 1 */
     let s=JSON.parse(localStorage.getItem('ironfield-save-v3')||'null');
     if(!s){const old=JSON.parse(localStorage.getItem('ironfield-save-v2')||'null');
@@ -1947,11 +1947,18 @@ function stallUpd(){if(net.mode==='guest'||phase!=='combat'||state!=='play'||spa
   if(air.length){const fs=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&!T.admin),msl=fs.filter(T=>T.ord&&T.ord.k==='aam'),pick=(msl.filter(T=>T.nation===nat)[0]||msl[0]||fs.sort((a,b)=>b.tier-a.tier)[0]);
     if(pick){for(let i=0;i<2;i++)spawnPlane(pick,'p');sayAll('Stalemate: AI '+pick.name+' ×2 scrambled to bring down the last aircraft','#8bd66e');}}}
 /* when the enemy brings aircraft and nobody in the squad flies or drives anti-air, the airfield sends help */
-function spawnAllies(nP){const lead=humans().find(h=>h.alive)||player;if(!lead)return;const nat=lead.T.nation,tier=Math.min(5,lead.T.tier),near=(a,b)=>Math.abs(a.tier-tier)-Math.abs(b.tier-tier);
+/* AI air support: fighters and anti-air come whenever enemy planes do, about one fighter per two enemy planes and one
+   AA vehicle per three (capped), topped up every 10 s while the wave lasts */
+let airBalT=0;
+function airBalance(force){if(net.mode==='guest'||state!=='play'||phase!=='combat')return;if(!force&&time-airBalT<10)return;airBalT=time;
+  const E=tanks.filter(t=>t.team==='e'&&t.air&&t.alive&&!(t.pai&&t.pai.mode==='exit')).length;if(!E)return;
+  const F=tanks.filter(t=>t.ally&&t.air&&t.alive).length,A=tanks.filter(t=>t.ally&&!t.air&&t.T.aa&&t.alive).length,nf=Math.max(0,Math.min(6,Math.ceil(E/2))-F),na=Math.max(0,Math.min(4,Math.ceil(E/3))-A);
+  if(nf||na)spawnAllies(nf,na);}
+function spawnAllies(nf,na){if(na===undefined){const nP=nf;nf=Math.min(3,1+Math.floor(nP/3));na=nP>=3?1:0;}const lead=humans().find(h=>h.alive)||player;if(!lead)return;const nat=lead.T.nation,tier=Math.min(5,lead.T.tier),near=(a,b)=>Math.abs(a.tier-tier)-Math.abs(b.tier-tier);
   const up=(a,b)=>Math.abs(a.tier-Math.min(5,tier+1))-Math.abs(b.tier-Math.min(5,tier+1))||b.tier-a.tier,fs=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&T.nation===nat&&!T.admin).sort(up),fi=fs[0];
-  if(fi){const n=Math.min(3,1+Math.floor(nP/3));for(let i=0;i<n;i++)spawnPlane(fs[Math.min(i,fs.length-1)],'p');sayAll('AI '+fi.name+(n>1?' ×'+n:'')+' scrambled to cover the squad','#8bd66e');}
-  if(nP>=3||!fi){const aa=ROSTER.filter(T=>T.aa&&!T.air&&T.nation===nat).sort(near)[0]||ROSTER.filter(T=>T.aa&&!T.air).sort(near)[0];
-    if(aa){const sp=freeSpotNear(lead.x,lead.y),t=makeTank(aa,sp.x,sp.y,'e');t.team='p';t.ally=true;t.a=lead.a;t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});sayAll('AI '+aa.name+' joins the squad to cover you from the air','#8bd66e');}}}
+  if(fi&&nf>0){for(let i=0;i<nf;i++)spawnPlane(fs[Math.min(i,fs.length-1)],'p');sayAll('AI '+fi.name+(nf>1?' ×'+nf:'')+' scrambled to cover the squad','#8bd66e');}
+  if(!fi&&!na)na=1;for(let k=0;k<na;k++){const aa=ROSTER.filter(T=>T.aa&&!T.air&&T.nation===nat).sort(near)[0]||ROSTER.filter(T=>T.aa&&!T.air).sort(near)[0];
+    if(aa){const sp=freeSpotNear(lead.x,lead.y),t=makeTank(aa,sp.x,sp.y,'e');t.team='p';t.ally=true;t.a=lead.a;t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});if(!k)sayAll('AI '+aa.name+(na>1?' ×'+na:'')+' joins the squad to cover you from the air','#8bd66e');}}}
 /* AA vehicles pick aircraft first and fire over cover with lead */
 /* threat score: low attackers and bombers come first, then whoever is closest */
 function airThreat(t,h){const d=Math.hypot(h.x-t.x,h.y-t.y);return d*(h.alt<.6?.6:1)*(h.T.cls==='bomber'?.75:1)*(h.crash?9:1);}
@@ -2032,7 +2039,7 @@ function startWave(n){
   let nAA=airH?Math.min((n>=3?1:0)+Math.floor(n/8)+Math.floor(airH/3),3):(n>=8&&Math.random()<.3?1:0);
   for(let i=0;i<nAA;i++)spawnQueue.push({T:pickAA(n),at:time+1+i*2});
   for(let i=0;i<nP;i++)spawnQueue.push({T:pickPlane(n),at:time+8+i*rand(3,7),air:1});
-  if(nP>0&&!humans().some(h=>h.alive&&(h.air||h.T.aa))&&!tanks.some(t=>t.ally&&t.alive))spawnAllies(nP);
+  if(nP>0)setTimeout(()=>{if(state==='play'&&phase==='combat')airBalance(true);},9000);
   setBanner({text:'WAVE '+n+(WXL[weather]?' · '+WXL[weather]:''),sub:count+(count===1?' enemy vehicle inbound':' enemy vehicles inbound')+(arty?' · artillery spotted':'')+(nP?' · '+nP+(nP>1?' aircraft':' aircraft'):'')+(nAA?' · anti-air':'')+(obj?' · OBJECTIVE: '+OBJN[obj.k]:''),t:4});
 }
 function spawnEnemy(T){const sp=spawnPoint(),t=makeTank(T,sp.x,sp.y,'e'),h=humans().find(q=>q.alive)||player;if(obj&&!obj.st&&t.ai&&!T.aa&&Math.random()<.5)t.ai.ob=1;t.a=Math.atan2(h.y-sp.y,h.x-sp.x);t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});}
@@ -2470,7 +2477,7 @@ async function redeem(){if(!store.acct){const m=$('#rdmMsg');m.textContent='Sign
     /* RP and vehicle codes go into your own save slot for good (as a guest you see them after leaving the room) */
     else if(/^rp:\d{1,7}$/.test(k)){const n=clamp(+k.slice(3),1,1e6);slot().rp+=n;persist();done.push('+'+fmt(n)+' RP'+where());}
     else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){const sl=slot();if(!sl.owned.includes(T.id))sl.owned.push(T.id);if(!sl.earned.includes(T.id))sl.earned.push(T.id);persist();done.push(T.name+' unlocked'+where());}else done.push('That vehicle is not in this version of the game');}
-    else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;const bn=cleanName(r.name);if(bn){store.name=bn;if(nameIn)nameIn.value=bn;}persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});
+    else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;const bn=cleanName(r.name);if(bn){store.name=bn;if(nameIn)nameIn.value=bn;}persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,nt:store.acct&&store.acct.nt||undefined,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});
       done.push(r.again?'Your '+(cleanName(r.label)||'Creator')+' badge and the callsign '+store.name+' are back on this device':(cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op. Keep this code: it brings the badge back on any device.');}}
   $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent=done.join(' · ')||'Done';fixSel();renderHangar();coopUI();if(net.mode==='host')sendLobby(true);}
 /* live settings from the server (news, RP events, maintenance, oldest build allowed), refreshed every 5 minutes */
@@ -2528,13 +2535,15 @@ function checkBadges(tks){const need=[...new Set(tks.filter(tk=>cleanBt(tk)&&!BA
 /* a badge's callsign is locked: nobody else may use it (the owner can move it in the panel) */
 const nameLocked=n=>!!n&&LIVE.names.has(nkey(n));
 const ownsName=(tk,n)=>{const v=tk&&BADGE.get(tk);return!!(v&&v.n&&v.n===nkey(n));};
-const nameOk=(tk,n)=>!nameLocked(n)||ownsName(tk,n);
-function hostName(pe,n){const v=pe.bt&&BADGE.get(pe.bt);if(v&&v.nm){pe.wantName=null;return v.nm;}if(!n||nameOk(pe.bt,n)){pe.wantName=null;return n;}
+const acctOwns=n=>!!store.acct&&!!n&&nkey(store.acct.name)===nkey(n);
+const nameOk=(tk,n)=>!nameLocked(n)||ownsName(tk,n)||acctOwns(n);
+function hostName(pe,n){const v=pe.bt&&BADGE.get(pe.bt);if(v&&v.nm){pe.wantName=null;return v.nm;}if(!n||!nameLocked(n)||ownsName(pe.bt,n)){pe.wantName=null;return n;}
+  if(pe.nt){pe.wantName=n;codeCall('/ncheck',{n,nt:pe.nt}).then(r=>{if(r&&r.ok&&pe.wantName===n&&net.peers.has(pe.pid)){pe.name=n;pe.wantName=null;net.lobbyKey='';sendLobby(true);coopUI();}else if(pe.wantName===n)sendTo(pe,{e:'sys',text:n+' is a locked callsign: pick another one'});});return pe.name||'Guest '+pe.pid.slice(1);}
   if(pe.bt&&BADGE.get(pe.bt)==='p')pe.wantName=n;else sendTo(pe,{e:'sys',text:n+' is a locked callsign: pick another one'});return pe.name||'Guest '+pe.pid.slice(1);}
 function lockNames(){
   const mine=store.badge?BADGE.get(store.badge):null;
   if(mine&&mine.nm){if(store.name!==mine.nm){store.name=mine.nm;persist();if(nameIn)nameIn.value=store.name;if(net.connected)netSend({e:'name',name:store.name});renderSquad();}}
-  else if(nameLocked(store.name)&&(!store.badge||mine===null)){store.name='Tanker-'+(100+Math.floor(Math.random()*900));persist();if(nameIn)nameIn.value=store.name;
+  else if(nameLocked(store.name)&&(!store.badge||mine===null)&&!acctOwns(store.name)){store.name='Tanker-'+(100+Math.floor(Math.random()*900));persist();if(nameIn)nameIn.value=store.name;
     toast('Someone with a badge owns that callsign, so yours was changed');if(net.connected)netSend({e:'name',name:store.name});renderSquad();}
   if(nameIn){const own=!!(mine&&mine.nm);nameIn.readOnly=own;nameIn.title=own?'Your callsign belongs to your badge':'';}
   if(net.mode!=='host')return;let ch=false;
@@ -2568,13 +2577,13 @@ async function cloudPush(){const a=store.acct;if(!a||cloud.busy)return;if(!a.dir
     else cloudDirty();}
   finally{cloud.busy=false;}renderAcct();}
 async function acctLoad(){const a=store.acct;if(!a)return;const r=await acctCall('load',{tk:a.tk});if(store.acct!==a)return;
-  if(r&&r.ok){if(r.name)a.name=r.name;if(r.bt&&!store.badge){store.badge=r.bt;checkBadges([r.bt]);}
+  if(r&&r.ok){if(r.name)a.name=r.name;if(r.nt)a.nt=r.nt;if(r.bt&&!store.badge){store.badge=r.bt;checkBadges([r.bt]);}
     if(r.save&&r.rev>a.rev)adoptCloud(r.save,r.rev);else if(a.dirty||!r.save)cloudPush();acctName();}
   else if(r&&(r.reason==='signin'||r.reason==='ban')){store.acct=null;persist();toast(ACCT_ERR[r.reason]);}renderAcct();}
 function acctName(){const a=store.acct;if(!a||!a.name)return;const mine=store.badge&&BADGE.get(store.badge);if(mine&&mine.nm)return;if(store.name!==a.name){store.name=a.name;nameIn.value=a.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();}nameIn.readOnly=true;nameIn.title='Your callsign is your account name';}
 async function acctGo(reg){const m=$('#acMsg'),name=cleanName($('#acName').value),pw=$('#acPw').value;m.textContent='…';
   const r=await acctCall(reg?'reg':'login',{name,pw,bt:store.badge});if(!r||!r.ok){m.textContent=ACCT_ERR[r&&r.reason]||'Something went wrong';if(r&&(r.reason==='net'||r.reason==='setup')){const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Why?';b.onclick=runDiag;m.append(' ',b);}return;}
-  store.acct={tk:r.tk,id:r.id,name:r.name,rev:r.rev||0,dirty:0};
+  store.acct={tk:r.tk,id:r.id,name:r.name,rev:r.rev||0,dirty:0,nt:r.nt||''};
   if(r.bt&&!store.badge){store.badge=r.bt;BADGE.delete(r.bt);checkBadges([r.bt]);}else if(store.badge&&!r.bt)acctCall('bt',{tk:r.tk,bt:store.badge});
   if(r.save){try{localStorage.setItem(STORE_KEY+'-local',JSON.stringify(store.slots));}catch(e){}adoptCloud(r.save,r.rev);toast('Signed in as '+r.name+': your cloud save is loaded');}
   else{store.acct.dirty=1;persist();cloudPush();toast(reg?'Account made: this device\'s saves are now in the cloud':'Signed in as '+r.name);}
@@ -2598,17 +2607,18 @@ let roomsT=0,roomBeat=0;
 async function roomsPoll(){clearTimeout(roomsT);if(hangarMode!=='mp'||net.mode!=='off'||state!=='hangar'||document.hidden){roomsT=setTimeout(roomsPoll,4000);return;}
   const L=await codeAPIs();let r=null;for(let i=0;i<L.length&&!r;i++){const k=(apiIdx+i)%L.length;try{const x=await fetch(L[k]+'/rooms',{cache:'no-store'});r=x.ok?await x.json():null;}catch(e){}}
   renderRooms(r&&Array.isArray(r.rooms)?r.rooms:null);roomsT=setTimeout(roomsPoll,20000);}
-function renderRooms(list){const box=$('#roomList');if(!box)return;box.textContent='';const el=(tag,props)=>Object.assign(document.createElement(tag),props||{});
+let roomsLast=null;
+function renderRooms(list){if(list!==undefined)roomsLast=list;list=roomsLast;const box=$('#roomList');if(!box)return;box.textContent='';const el=(tag,props)=>Object.assign(document.createElement(tag),props||{});
   if(!list){box.append(el('p',{className:'why',textContent:'Can\'t reach the room list. Joining by code still works.'}));return;}
-  const ok=list.filter(r=>r&&r.v===PROTO&&/^[A-Z0-9]{6}$/.test(r.code));if(!ok.length){box.append(el('p',{className:'why',textContent:'No open rooms right now. Create one!'}));return;}
-  for(const r of ok.slice(0,30)){const row=el('div',{className:'room-row'}),full=r.n>=r.max;row.append(el('b',{textContent:cleanName(r.name)||'Room'}),el('span',{className:'why',textContent:Math.round(num(r.n,1,14))+'/'+Math.round(num(r.max,2,14))+(r.st?' · wave '+Math.round(num(r.wave,0,1e4)):' · in hangar')+(r.lock?' · locked':'')}));
-    const j=el('button',{type:'button',className:'btn small',textContent:'Join',disabled:full||!!r.lock});j.onclick=()=>{$('#joinCode').value=r.code;joinCoop(r.code);};row.append(j);box.append(row);}}
+  const q=nkey(($('#roomFind')||{}).value||''),ok=list.filter(r=>r&&/^[A-Z0-9]{6}$/.test(r.code)&&(!q||nkey(r.name).includes(q)));if(!ok.length){box.append(el('p',{className:'why',textContent:q?'No room with that host.':'No open rooms right now. Create one!'}));return;}
+  for(const r of ok.slice(0,30)){const row=el('div',{className:'room-row'}),full=r.n>=r.max;row.append(el('b',{textContent:cleanName(r.name)||'Room'}),el('span',{className:'why',textContent:Math.round(num(r.n,1,14))+'/'+Math.round(num(r.max,2,14))+(r.st?' · wave '+Math.round(num(r.wave,0,1e4)):' · in hangar')+(r.lock?' · locked':'')+(r.v!==PROTO?' · different game version':'')}));
+    const j=el('button',{type:'button',className:'btn small',textContent:r.v!==PROTO?'Update first':'Join',disabled:full||!!r.lock||r.v!==PROTO});j.onclick=()=>{$('#joinCode').value=r.code;joinCoop(r.code);};row.append(j);box.append(row);}}
 async function roomUp(down){if(net.mode!=='host'||!net.code)return;if(!net.roomK)net.roomK=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
   if(down||!store.pub){if(net.listed){net.listed=false;codeCall('/room',{op:'down',code:net.code,k:net.roomK});}return;}
   const mine=store.badge&&BADGE.get(store.badge);net.listed=true;codeCall('/room',{op:'up',tk:store.acct?store.acct.tk:'',code:net.code,k:net.roomK,name:store.name,n:humansCount(),max:MAX_PLAYERS,lock:net.locked?1:0,wave,st:state==='hangar'?0:1,v:PROTO,dev:store.dev,bg:mine&&mine.l||''});}
 const humansCount=()=>1+peerList().length;
 setInterval(()=>{if(net.mode==='host')roomUp();},30000);
-{const pb=$('#pubRoom');pb.checked=!!store.pub;pb.addEventListener('change',()=>{store.pub=pb.checked?1:0;persist();roomUp();});}
+{$('#roomFind').addEventListener('input',()=>renderRooms());const pb=$('#pubRoom');pb.checked=!!store.pub;pb.addEventListener('change',()=>{store.pub=pb.checked?1:0;persist();roomUp();});}
 /* ================= live player link =================
    The game tells the server who is playing (for the owner's panel) and reports cleared waves for the daily stats;
    the server can send a message, a kick, a ban or "your save changed" back. */
@@ -2652,7 +2662,7 @@ function spawnBoss(){const lead=humans().find(h=>h.alive)||player;if(!lead)retur
   const sp=spawnPoint(),t=makeTank(T,sp.x,sp.y,'e');t.boss=1;for(const c of t.comps){c.max*=3;c.hp=c.max;}t.a=Math.atan2(lead.y-sp.y,lead.x-sp.x);t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});
   sayAll('BOSS: a giant '+T.name+' has entered the battle. Destroy it for a big RP bonus!','#f2a23a');setBanner({text:'BOSS INCOMING',sub:T.name+' · three times as tough',t:3.5});}
 function airRaid(){const lead=humans().find(h=>h.alive)||player;if(!lead)return;const tier=lead.T.tier,B=ROSTER.filter(T=>T.air&&T.cls==='bomber'&&!T.admin).sort((a,b)=>Math.abs(a.tier-tier)-Math.abs(b.tier-tier));if(!B.length)return;
-  const n=3+Math.min(5,playerCount());for(let i=0;i<n;i++)spawnPlane(B[i%Math.min(3,B.length)]);if(!humans().some(h=>h.alive&&(h.air||h.T.aa))&&!tanks.some(t=>t.ally&&t.alive&&t.air))spawnAllies(n);
+  const n=3+Math.min(5,playerCount());for(let i=0;i<n;i++)spawnPlane(B[i%Math.min(3,B.length)]);airBalance(true);
   sayAll('AIR RAID: '+n+' enemy bombers inbound!','#ee5d50');setBanner({text:'AIR RAID',sub:n+' bombers inbound',t:3});}
 /* confetti, a screen shake, a goofy horn */
 function funFx(k){if(k==='shake'){if(state!=='hangar')shake=Math.max(shake,16);else{document.body.animate([{transform:'translate(0,0)'},{transform:'translate(-8px,4px)'},{transform:'translate(7px,-5px)'},{transform:'translate(-5px,-3px)'},{transform:'translate(0,0)'}],{duration:450,iterations:3});}return;}
@@ -2731,7 +2741,7 @@ function renderHangar(){
     const box=$('#abBtns'),N={nuke:'Nukes',admin:'Every vehicle',kick:'Can\'t be kicked',vote:'Starts waves'};box.textContent='';
     for(const x of ['nuke','admin','kick','vote'])if(myAbAll().has(x)){const on=!(store.abOff||[]).includes(x),bt=document.createElement('button');bt.type='button';bt.className='btn small'+(on?'':' ghost');bt.textContent=N[x]+': '+(on?'ON':'OFF');
       bt.addEventListener('click',()=>{const L=store.abOff||(store.abOff=[]);if(on)L.push(x);else L.splice(L.indexOf(x),1);persist();
-        if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,cmd:net.cmdTk||undefined,ao:L.join(',')});fixSel();renderHangar();if(net.mode==='host')sendLobby(true);toast(N[x]+(on?' off':' on'));});box.append(bt);}}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
+        if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,nt:store.acct&&store.acct.nt||undefined,cmd:net.cmdTk||undefined,ao:L.join(',')});fixSel();renderHangar();if(net.mode==='host')sendLobby(true);toast(N[x]+(on?' off':' on'));});box.append(bt);}}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
   if(net.mode==='host'&&net.connected)sendLobby();
   $('#tabs').innerHTML=NATIONS.map(n=>'<button class="tab" type="button" role="tab" id="tab-'+n.id+'" data-n="'+n.id+'" aria-selected="'+(n.id===save.nation)+'">'+flagImg(n.id)+n.name+'</button>').join('');
   if(TYPE[viewId]&&(TYPE[viewId].air?'air':'ground')!==treeDom)treeDom=TYPE[viewId].air?'air':'ground';
@@ -2783,7 +2793,7 @@ function renderDetail(){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,nt:store.acct&&store.acct.nt||undefined,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);
 }
@@ -2798,7 +2808,7 @@ function renderAirDetail(T,row,action){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,nt:store.acct&&store.acct.nt||undefined,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);}
 function drawPreview(T){const c=$('#preview');if(!c)return;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle=T.air?'#33402c':'#2c3420';g.fillRect(0,0,c.width,c.height);
@@ -2815,7 +2825,7 @@ let swarmK=1;
 function fireSlot(p){const L=p.shotAt||(p.shotAt=[]);while(L.length&&time-L[0]>1.6)L.shift();return L.length<(swarmK>1.3?2:3);}
 function swarmUpd(){if(net.mode==='guest')return;let e=0,f=0;for(const t of tanks){if(!t.alive||t.air)continue;if(t.team==='e')e++;else if(t.team==='p')f++;}const r=e/Math.max(1,f);swarmK+=(clamp(1+(r-2.5)*.1,1,1.8)-swarmK)*.05;}
 function update(dt){
-  time+=dt;nukeCD=Math.max(0,nukeCD-dt);swarmUpd();stallUpd();
+  time+=dt;nukeCD=Math.max(0,nukeCD-dt);swarmUpd();stallUpd();airBalance();
   playerInput(dt);
   {let alive=0;for(const t of tanks)if(t.team==='e'&&t.alive)alive++;const cap=12+3*playerCount();for(const q of spawnQueue.slice())if(time>=q.at){if(alive>=cap&&!q.air){q.at=time+1;continue;}spawnQueue.splice(spawnQueue.indexOf(q),1);if(q.air)spawnPlane(q.T);else spawnEnemy(q.T);alive++;}}
   if(save.frBoom){frenchT+=dt;if(frenchT>=10){frenchT-=10;for(const t of tanks.slice())if(t.alive&&t.T.nation==='fra'&&Math.random()<.2){kill(t,null,'french');say(t,'Your '+t.T.name+' spontaneously exploded. French engineering.','#ee5d50');}}}
@@ -3504,7 +3514,7 @@ function hostData(pe,d){
   if(d.e==='api'){const id=Math.round(num(d.id,0,1e9)),path=String(d.p||'');if(!RELAY.includes(path)||!d.b||typeof d.b!=='object'||JSON.stringify(d.b).length>3000||!rateOk(pe.api||(pe.api=[]),60000,15)){sendTo(pe,{e:'apir',id,r:{ok:false,reason:'net'}});return;}
     codeCall(path,d.b).then(r=>{if(net.peers.has(pe.pid))sendTo(pe,{e:'apir',id,r});});return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
-    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;pe.tank=T&&(!T.admin||peAll(pe))?d.tank:'m4a1';pe.bt=cleanBt(d.bt);pe.abOff=new Set(String(d.ao||'').split(',').filter(x=>['nuke','admin','kick','vote'].includes(x)));checkBadges([pe.bt]);const n=hostName(pe,cleanName(d.name));pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
+    const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;pe.tank=T&&(!T.admin||peAll(pe))?d.tank:'m4a1';pe.bt=cleanBt(d.bt);pe.nt=String(d.nt||'').replace(/[^a-f0-9]/g,'').slice(0,24);pe.abOff=new Set(String(d.ao||'').split(',').filter(x=>['nuke','admin','kick','vote'].includes(x)));checkBadges([pe.bt]);const n=hostName(pe,cleanName(d.name));pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
     if(first&&d.cmd){codeCall('/cmdchk',{tk:String(d.cmd).slice(0,80)}).then(r=>{if(!r||!r.ok||r.code!==net.code||!net.peers.has(pe.pid))return;pe.cmd=true;pe.name='Commander';if(pe.t){dropPeerTank(pe);}sysAll('The Commander is watching this battle');net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&player)hotJoin(pe);});}
     if(first&&d.dev){pe.dev=String(d.dev).replace(/[^a-f0-9]/g,'').slice(0,24);if(pe.dev)codeCall('/bchk',{devs:[pe.dev]}).then(r=>{if(r&&Array.isArray(r.bad)&&r.bad.includes(pe.dev)&&net.peers.has(pe.pid)){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);}});}
     if(first){const k=pe.name.toLowerCase(),back=net.away&&net.away[k],lf=net.left&&net.left[k];pe.rp=lf?lf.rp:save.rp;pe.mine=new Set(lf&&lf.mine||[]);
@@ -3567,7 +3577,7 @@ async function joinCoop(code){
   catch(err){netError(err);}
 }
 function attach(conn){net.conn=conn;
-  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name,bt:store.badge,dev:store.dev,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
+  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name,bt:store.badge,dev:store.dev,nt:store.acct&&store.acct.nt||undefined,cmd:net.cmdTk||undefined,ao:(store.abOff||[]).join(',')});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
   conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
   if(net.mode==='host')roomUp(true);
