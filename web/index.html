@@ -1200,15 +1200,28 @@ function genMap(seed){
     const hp=kind==='rock'?1e9:kind==='wall'?w*h/4:w*h/26;
     const o={x,y,w,h,kind,s:r(),hp,max:hp,id:obs.length};obs.push(o);gridAdd(o);
   }
+  /* villages: a church and a handful of houses beside a road; they fall apart under fire like any building */
+  const nearRoad=(x,y,d)=>gFeat.roads.some(rd=>{for(let i=1;i<rd.length;i++){const a=rd[i-1],b=rd[i],dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy,u=clamp(((x-a[0])*dx+(y-a[1])*dy)/l2,0,1);if(Math.hypot(a[0]+dx*u-x,a[1]+dy*u-y)<d)return true;}return false;});
+  villages=[];for(let t2=0;villages.length<Math.max(2,Math.round(A*.45))&&t2<300;t2++){const rd=gFeat.roads[Math.floor(r()*gFeat.roads.length)],j=1+Math.floor(r()*(rd.length-1)),u=r(),x=rd[j-1][0]+(rd[j][0]-rd[j-1][0])*u,y=rd[j-1][1]+(rd[j][1]-rd[j-1][1])*u;
+    if(x<450||y<450||x>WW-450||y>WH-450||Math.hypot(x-WW/2,y-WH/2)<750||nearField(x-250,y-250,500,500)||inWater(x,y,300)||villages.some(v=>Math.hypot(v.x-x,v.y-y)<1600))continue;villages.push({x,y});
+    const n=7+Math.floor(r()*5);for(let k=0,placed=0;k<n*6&&placed<n;k++){const church=placed===0,W=church?72:46+r()*34,H=church?118:40+r()*30,hx=x+(r()-.5)*460-W/2,hy=y+(r()-.5)*460-H/2;
+      if(nearRoad(hx+W/2,hy+H/2,Math.max(W,H)/2+34)||wet(hx,hy,W,H,20)||obs.some(o=>hx<o.x+o.w+24&&hx+W+24>o.x&&hy<o.y+o.h+24&&hy+H+24>o.y))continue;
+      const hp=W*H/20,o={x:hx,y:hy,w:W,h:H,kind:'bldg',s:r(),hp,max:hp,id:obs.length,house:church?2:1};obs.push(o);gridAdd(o);placed++;}}
   /* hangars beside each runway (destroy the enemy's and their aircraft must fly in from far away) */
   for(const f of fields)for(const k of[.18,.52]){const o={x:Math.round(f.x+f.w*k),y:f.y-170,w:150,h:110,kind:'bldg',s:.2,hp:2600,max:2600,id:obs.length,hangar:f.team};obs.push(o);gridAdd(o);}
   /* fuel dumps: shoot one and it goes up, taking whatever is parked next to it */
   const freeRect=(x,y,w,h,pad)=>!(x<90||y<90||x+w>WW-90||y+h>WH-90)&&!nearField(x,y,w,h)&&!wet(x,y,w,h,pad)&&Math.hypot(x+w/2-WW/2,y+h/2-WH/2)>500&&!obs.some(o=>x<o.x+o.w+pad&&x+w+pad>o.x&&y<o.y+o.h+pad&&y+h+pad>o.y);
   const ef=fields[1];for(const[dx,dy]of[[-140,40],[ef.w+60,30]]){const x=ef.x+dx,y=ef.y+dy;if(!obs.some(o=>x<o.x+o.w+20&&x+56>o.x&&y<o.y+o.h+20&&y+56>o.y)){const o={x,y,w:56,h:56,kind:'fuel',s:r(),hp:60,max:60,id:obs.length};obs.push(o);gridAdd(o);}}
   for(let i=0,t2=0;i<Math.round(A*.9)&&t2<400;t2++){const x=150+r()*(WW-300),y=150+r()*(WH-300);if(!freeRect(x,y,56,56,90))continue;const o={x,y,w:56,h:56,kind:'fuel',s:r(),hp:60,max:60,id:obs.length};obs.push(o);gridAdd(o);i++;}
+  /* explosive barrels in little stacks, often at the edge of a village: shoot one and it takes its neighbours along */
+  for(let i=0,t2=0;i<Math.round(A*2.2)&&t2<500;t2++){const v=villages.length&&r()<.5?villages[Math.floor(r()*villages.length)]:null,cx=v?v.x+(r()-.5)*600:200+r()*(WW-400),cy=v?v.y+(r()-.5)*600:200+r()*(WH-400);
+    if(!freeRect(cx-30,cy-30,60,60,40))continue;for(let k=0;k<3+Math.floor(r()*3);k++){const x=cx+(k%3)*24-24,y=cy+Math.floor(k/3)*24-12;const o={x,y,w:20,h:20,kind:'fuel',barrel:1,s:r(),hp:25,max:25,id:obs.length};obs.push(o);gridAdd(o);}i++;}
   /* supply depots: stop inside one for 3 s to repair, restock and swap out wounded crew */
   depots=[{x:fields[0].x+fields[0].w+150,y:fields[0].y+fields[0].h/2}];
   for(let t2=0;depots.length<1+Math.round(A*.6)&&t2<400;t2++){const x=300+r()*(WW-600),y=300+r()*(WH-600);if(!freeRect(x-80,y-80,160,160,40)||depots.some(d=>Math.hypot(d.x-x,d.y-y)<1400))continue;depots.push({x,y});}
+  /* minefields behind warning signs: the mines are buried and only show up close */
+  minefields=[];mines=[];for(let i=0,t2=0;i<Math.max(2,Math.round(A*.5))&&t2<400;t2++){const w=260+r()*120,h=200+r()*100,x=300+r()*(WW-600-w),y=300+r()*(WH-600-h);
+    if(Math.hypot(x+w/2-WW/2,y+h/2-WH/2)<1400||!freeRect(x,y,w,h,30)||nearRoad(x+w/2,y+h/2,Math.max(w,h)*.5)||fields.some(f=>x<f.x+f.w+500&&x+w>f.x-500&&y<f.y+f.h+500&&y+h>f.y-500)||depots.some(d=>d.x>x-450&&d.x<x+w+450&&d.y>y-450&&d.y<y+h+450))continue;minefields.push({x,y,w,h});for(let k=0;k<11;k++)mines.push({x:x+20+r()*(w-40),y:y+20+r()*(h-40),i:mines.length,live:true});i++;}
   const addTree=(x,y)=>{if(x<30||y<30||x>WW-30||y>WH-30)return;if(Math.hypot(x-WW/2,y-WH/2)<230)return;if(inObs(x,y,14)||inWater(x,y,18))return;
     if(fields.some(f=>x>f.x-60&&x<f.x+f.w+60&&y>f.y-60&&y<f.y+f.h+60)||depots.some(d=>Math.hypot(d.x-x,d.y-y)<110))return;
     const rr=8+r()*7;trees.push({x,y,r:rr,hp:rr*7,fallen:false,fa:0,tone:r(),i:trees.length});};
@@ -1223,7 +1236,7 @@ function genMap(seed){
    Rivers block tanks (and the pathfinder) but never shells or line of sight. Each road that crosses a river gets a bridge;
    enough explosive (heavy shells, bombs) drops it, and the gap becomes water. Mud slows tanks, hills give +15 % penetration
    to whoever fires from them, and a vehicle in thick forest can't be seen from far away until it fires. */
-let rivers=[],bridges=[],water=[],mud=[],hills=[];
+let rivers=[],bridges=[],water=[],mud=[],hills=[],villages=[],minefields=[],mines=[];
 const WGS=256,WPAD=128;let wGrid=[[]],wgC=1,wgR=1;
 function waterIndex(){wgC=Math.ceil(WW/WGS)+1;wgR=Math.ceil(WH/WGS)+1;wGrid=Array.from({length:wgC*wgR},()=>[]);
   for(const o of water){const c0=clamp(Math.floor((o.x-WPAD)/WGS),0,wgC-1),c1=clamp(Math.floor((o.x+o.w+WPAD)/WGS),0,wgC-1),r0=clamp(Math.floor((o.y-WPAD)/WGS),0,wgR-1),r1=clamp(Math.floor((o.y+o.h+WPAD)/WGS),0,wgR-1);
@@ -1258,6 +1271,16 @@ function collapseBridge(i,by,quiet){const b=bridges[i];if(!b||!b.up)return;b.up=
     sayAll('A bridge has collapsed!','#ebd257');}
   if(!quiet){fx({k:'bridge',i,x:r1(b.x),y:r1(b.y)});buildNav();reachFromHumans();navDirty=true;}}
 function bridgeBlast(x,y,f,by){if(net.mode==='guest')return;for(const b of bridges){if(!b.up)continue;const d=Math.hypot(b.x-x,b.y-y),R=2.2*Math.cbrt(f)+b.span*.5;if(d>=R)continue;b.hp-=f/1000*(1-d/R)*1.6;if(b.hp<=0)collapseBridge(b.i,by);}}
+/* mines go off under any ground vehicle that drives over them (enemies too: lure them in) */
+function mineCheck(){if(net.mode==='guest'||!mines.length)return;for(const t of tanks){if(!t.alive||t.air)continue;for(const m of mines){if(!m.live||Math.abs(m.x-t.x)>70||Math.abs(m.y-t.y)>70)continue;if(inTank(t,m.x,m.y,3))mineBoom(m,t);}}}
+function mineBoom(m,t){m.live=false;fx({k:'mine',i:m.i});explosion(m.x,m.y,5000,null,{direct:t,mul:.9});if(t.alive){t.tracksT=Math.max(t.tracksT||0,10);say(t,'Mine! Your tracks are blown','#ee5d50');}}
+function drawMines(hw,hh){const v=viewer()||player;ctx.save();ctx.font='700 9px "IBM Plex Mono",monospace';ctx.textAlign='center';
+  for(const f of minefields){if(Math.abs(f.x+f.w/2-cam.x)>hw+f.w||Math.abs(f.y+f.h/2-cam.y)>hh+f.h)continue;
+    ctx.strokeStyle='rgba(235,210,87,.35)';ctx.setLineDash([4,10]);ctx.lineWidth=1.5;ctx.strokeRect(f.x,f.y,f.w,f.h);ctx.setLineDash([]);
+    for(const[sx,sy]of[[f.x,f.y],[f.x+f.w,f.y],[f.x,f.y+f.h],[f.x+f.w,f.y+f.h],[f.x+f.w/2,f.y],[f.x+f.w/2,f.y+f.h]]){ctx.fillStyle='#3a3020';ctx.fillRect(sx-1,sy-2,2,12);ctx.fillStyle='#ebd257';ctx.beginPath();ctx.moveTo(sx,sy-14);ctx.lineTo(sx+8,sy-1);ctx.lineTo(sx-8,sy-1);ctx.closePath();ctx.fill();ctx.fillStyle='#1a1a14';ctx.fillText('!',sx,sy-3);}
+    ctx.fillStyle='rgba(235,210,87,.8)';ctx.fillText('MINES',f.x+f.w/2,f.y-18);}
+  if(v)for(const m of mines){if(!m.live)continue;const d=Math.hypot(m.x-v.x,m.y-v.y);if(d>190)continue;ctx.globalAlpha=clamp((190-d)/120,0,.8);ctx.fillStyle='#2a2418';ctx.beginPath();ctx.arc(m.x,m.y,6,0,TAU);ctx.fill();ctx.strokeStyle='#8a7a50';ctx.lineWidth=1;ctx.stroke();}
+  ctx.restore();}
 function drawBridges(hw,hh){for(const b of bridges){if(Math.abs(b.x-cam.x)>hw+b.span||Math.abs(b.y-cam.y)>hh+b.span)continue;ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.a);const L=b.span,W=b.wd;
   if(b.up){ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(-W/2+5,-L/2+6,W,L);ctx.fillStyle='#6a5a3c';ctx.fillRect(-W/2,-L/2,W,L);ctx.strokeStyle='rgba(30,22,12,.45)';ctx.lineWidth=1;ctx.beginPath();for(let y=-L/2+6;y<L/2;y+=7){ctx.moveTo(-W/2,y);ctx.lineTo(W/2,y);}ctx.stroke();
     ctx.fillStyle='#3d3526';ctx.fillRect(-W/2-3,-L/2,4,L);ctx.fillRect(W/2-1,-L/2,4,L);if(b.hp<40){ctx.fillStyle='rgba(20,16,10,'+clamp((40-b.hp)/40*.6,0,.6)+')';ctx.fillRect(-W/2,-L*.15,W,L*.3);}}
@@ -1266,7 +1289,7 @@ function drawBridges(hw,hh){for(const b of bridges){if(Math.abs(b.x-cam.x)>hw+b.
 function destroyObstacle(o,quiet,by){
   if(!removeObs(o))return;
   fx({k:'obs',id:o.id,x:r1(o.x),y:r1(o.y),w:r1(o.w),h:r1(o.h)});
-  if(o.kind==='fuel'&&net.mode!=='guest')fuelQ.push({x:o.x+o.w/2,y:o.y+o.h/2,by,at:time+rand(.05,.25)});
+  if(o.kind==='fuel'&&net.mode!=='guest')fuelQ.push({x:o.x+o.w/2,y:o.y+o.h/2,by,at:time+rand(.05,.25),f:o.barrel?7000:26000});
   if(o.hangar==='e'&&net.mode!=='guest'&&!obs.some(q=>q.hangar==='e')){sayAll('Enemy airfield destroyed! Their planes now have to come from far away','#8bd66e');if(isHuman(by))rpFor(by,Math.round(400*rpMul()));}
   if(!quiet){buildNav();reachFromHumans();navDirty=true;}
 }
@@ -1317,6 +1340,7 @@ function miniBg(){if(miniC&&miniVer===obsVer&&miniC.width===Math.ceil(WW*MINI_S)
   const g=miniC.getContext('2d'),k=MINI_S;g.clearRect(0,0,miniC.width,miniC.height);g.fillStyle='rgba(60,90,40,.6)';for(const tr of trees)if(!tr.fallen)g.fillRect(tr.x*k-.6,tr.y*k-.6,1.2,1.2);
   g.fillStyle='rgba(70,120,130,.85)';for(const o of water)g.fillRect(o.x*k,o.y*k,Math.max(.8,o.w*k),Math.max(.8,o.h*k));
   g.fillStyle='rgba(150,120,80,.9)';for(const b of bridges)if(b.up)g.fillRect(b.x*k-2,b.y*k-2,4,4);
+  g.strokeStyle='rgba(235,210,87,.8)';g.lineWidth=1;for(const f of minefields)g.strokeRect(f.x*k,f.y*k,f.w*k,f.h*k);
   g.fillStyle='rgba(216,207,162,.35)';for(const o of obs)g.fillRect(o.x*k,o.y*k,Math.max(.8,o.w*k),Math.max(.8,o.h*k));
   for(const f of fields){g.fillStyle=f.team==='p'?'rgba(139,214,110,.7)':'rgba(238,93,80,.7)';g.fillRect(f.x*k,f.y*k,f.w*k,Math.max(2,f.h*k));}
   g.fillStyle='rgba(139,214,110,.8)';for(const d of depots){g.fillRect(d.x*k-2.5,d.y*k-.8,5,1.6);g.fillRect(d.x*k-.8,d.y*k-2.5,1.6,5);}return miniC;}
@@ -2489,8 +2513,8 @@ function update(dt){
     if(dead){const j=shells.indexOf(s);if(j>=0)shells.splice(j,1);}}
   for(let i=strikes.length-1;i>=0;i--){const q=strikes[i];q.t-=dt;if(q.target&&q.target.alive){q.x=q.target.x;q.y=q.target.y;}if(q.t<=-1.5)strikes.splice(i,1);}
   strikeSmoke(dt);
-  for(let i=fuelQ.length-1;i>=0;i--){const q=fuelQ[i];if(time<q.at)continue;fuelQ.splice(i,1);explosion(q.x,q.y,26000,q.by||null);for(let k=0;k<6;k++)fx({k:'boom',x:r1(q.x+rand(-30,30)),y:r1(q.y+rand(-30,30)),f:2500});}
-  updDepots(dt);
+  for(let i=fuelQ.length-1;i>=0;i--){const q=fuelQ[i];if(time<q.at)continue;fuelQ.splice(i,1);explosion(q.x,q.y,q.f||26000,q.by||null);for(let k=0;k<(q.f<20000?2:6);k++)fx({k:'boom',x:r1(q.x+rand(-30,30)),y:r1(q.y+rand(-30,30)),f:2500});}
+  mineCheck();updDepots(dt);
   updNukes(dt);
   {const wr=tanks.filter(k=>!k.alive&&!isHuman(k)&&!k.air);if(wr.length>14){const old=new Set(wr.slice(0,wr.length-14));tanks=tanks.filter(k=>!old.has(k));navDirty=true;}}
   navT-=dt;if(navDirty&&navT<=0){rebuildDynNav();navT=1;}
@@ -2530,7 +2554,13 @@ function drawDepot(d){ctx.fillStyle='rgba(139,214,110,.12)';ctx.beginPath();ctx.
 function drawObs(o){
   ctx.fillStyle='rgba(0,0,0,.32)';ctx.fillRect(o.x+9,o.y+11,o.w,o.h);
   const dmg=o.max&&o.max<1e8?1-o.hp/o.max:0;
-  if(o.kind==='bldg'){const horiz=o.w>=o.h;
+  if(o.house){const horiz=o.w>=o.h,rc=o.house===2?['#4c4a50','#5e5c62']:o.s<.5?['#7a3a26','#934a32']:['#6a4630','#80583c'];ctx.fillStyle=rc[0];ctx.fillRect(o.x,o.y,o.w,o.h);ctx.fillStyle=rc[1];if(horiz)ctx.fillRect(o.x,o.y,o.w,o.h/2);else ctx.fillRect(o.x,o.y,o.w/2,o.h);
+    ctx.strokeStyle='rgba(0,0,0,.22)';ctx.lineWidth=1;ctx.beginPath();if(horiz)for(let y=o.y+5;y<o.y+o.h;y+=5){ctx.moveTo(o.x,y);ctx.lineTo(o.x+o.w,y);}else for(let x=o.x+5;x<o.x+o.w;x+=5){ctx.moveTo(x,o.y);ctx.lineTo(x,o.y+o.h);}ctx.stroke();
+    ctx.strokeStyle='#2a1d14';ctx.lineWidth=2;ctx.strokeRect(o.x+1,o.y+1,o.w-2,o.h-2);ctx.strokeStyle='rgba(255,230,200,.25)';ctx.beginPath();if(horiz){ctx.moveTo(o.x+2,o.y+o.h/2);ctx.lineTo(o.x+o.w-2,o.y+o.h/2);}else{ctx.moveTo(o.x+o.w/2,o.y+2);ctx.lineTo(o.x+o.w/2,o.y+o.h-2);}ctx.stroke();
+    if(o.house===2){ctx.fillStyle='#3a383e';ctx.fillRect(o.x+o.w/2-14,o.y-6,28,30);ctx.fillStyle='#d8cfa2';ctx.fillRect(o.x+o.w/2-1.5,o.y-2,3,14);ctx.fillRect(o.x+o.w/2-5,o.y+2,10,3);}
+    else if(o.s>.3){ctx.fillStyle='#4a3a30';ctx.fillRect(o.x+o.w*.68,o.y+o.h*.15,8,8);}}
+  else if(o.kind==='fuel'&&o.barrel){ctx.fillStyle=o.s<.5?'#8a2a1c':'#2f4a2a';ctx.beginPath();ctx.arc(o.x+10,o.y+10,9.5,0,TAU);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1.5;ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.arc(o.x+10,o.y+10,6,0,TAU);ctx.stroke();}
+  else if(o.kind==='bldg'){const horiz=o.w>=o.h;
     ctx.fillStyle='#5a5044';ctx.fillRect(o.x,o.y,o.w,o.h);ctx.fillStyle='#71665a';if(horiz)ctx.fillRect(o.x,o.y,o.w,o.h/2);else ctx.fillRect(o.x,o.y,o.w/2,o.h);
     ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=1;
     if(horiz){for(let x=o.x+8;x<o.x+o.w;x+=8){ctx.beginPath();ctx.moveTo(x,o.y);ctx.lineTo(x,o.y+o.h);ctx.stroke();}}else{for(let y=o.y+8;y<o.y+o.h;y+=8){ctx.beginPath();ctx.moveTo(o.x,y);ctx.lineTo(o.x+o.w,y);ctx.stroke();}}
@@ -2665,7 +2695,7 @@ function draw(dt){
   const ox=VW/2+sx-cam.x*ZOOM,oy=VH/2+sy-cam.y*ZOOM;
   const vx0=cam.x-hw-60,vx1=cam.x+hw+60,vy0=cam.y-hh-60,vy1=cam.y+hh+60,vis=(x,y,r)=>x+r>vx0&&x-r<vx1&&y+r>vy0&&y-r<vy1;
   ctx.setTransform(DPR*ZOOM,0,0,DPR*ZOOM,DPR*ox,DPR*oy);
-  drawGround(hw,hh);drawBridges(hw,hh);
+  drawGround(hw,hh);drawBridges(hw,hh);drawMines(hw,hh);
   ctx.strokeStyle='rgba(216,207,162,.25)';ctx.lineWidth=4;ctx.strokeRect(0,0,WW,WH);
   /* blast marks fade away quickly (CRATER_LIFE s, nukes longer) */
   craters=craters.filter(c=>time-(c.t??time)<(c.nuke?CRATER_LIFE*4:CRATER_LIFE));
@@ -3128,7 +3158,7 @@ function hostData(pe,d){
 }
 function spawnPeerTank(pe,x,y,a){const T=tget(pe.tank);if(!T||(T.admin&&!peAll(pe)))return null;const t=makeTank(T,x,y,'p');t.a=a;t.aimAt=a;t.peer=pe;pe.t=t;pe.stats=pe.stats||newStats();t.stats=pe.stats;pe.input=null;pe.lastClicks=undefined;pe.lastPicks=undefined;pe.deathCause='';tanks.push(t);return t;}
 function sendStart(pe){if(!pe.t||!player)return;const have=new Set(obs.map(o=>o.id)),gone=[];for(let i=0;i<obsTotal;i++)if(!have.has(i))gone.push(i);
-  sendTo(pe,{e:'start',seed:curSeed,mw:WW,mh:WH,you:pe.t.nid,host:player.nid,w:wave,br:bridges.filter(b=>!b.up).map(b=>b.i),gone,fall:trees.filter(t=>t.fallen).map(t=>[t.i,r2(t.fa)]),cr:craters.slice(-100).map(c=>[r1(c.x),r1(c.y),r1(c.r),c.nuke?1:0])});}
+  sendTo(pe,{e:'start',seed:curSeed,mw:WW,mh:WH,you:pe.t.nid,host:player.nid,w:wave,br:bridges.filter(b=>!b.up).map(b=>b.i),mn:mines.filter(m=>!m.live).map(m=>m.i),gone,fall:trees.filter(t=>t.fallen).map(t=>[t.i,r2(t.fa)]),cr:craters.slice(-100).map(c=>[r1(c.x),r1(c.y),r1(c.r),c.nuke?1:0])});}
 function hotJoin(pe){const mate=humans().find(h=>h.alive)||player;if(!mate)return;const sp=freeSpotNear(mate.x,mate.y);if(!spawnPeerTank(pe,sp.x,sp.y,mate.a))return;
   sendStart(pe);sayAll(pe.name+' joined the battle in the '+pe.t.T.name,'#8bd66e');net.lobbyKey='';sendLobby();}
 let bgTimer=null;
@@ -3208,7 +3238,7 @@ function guestData(d){
     net.meIdx=Math.round(num(d.me,-1,MAX_PLAYERS));const h=net.squad[0];if(h){net.remote.name=h[0];net.remote.tank=h[1];}net.remote.st=d.st?1:0;net.remote.fr=d.fr?1:0;coopUI();return;}
   if(d.e==='chat'){const t=cleanText(d.text);if(!t)return;addChat(cleanName(d.from)||'Player',t,'them');sfx.ping();return;}
   if(d.e==='sys'){const t=cleanText(d.text);if(t)addChat(null,t,'sys');return;}
-  if(d.e==='start'){if(isFinite(+d.seed))guestStart({br:Array.isArray(d.br)?d.br.slice(0,20):[],seed:+d.seed|0,mw:Math.round(num(d.mw,3000,10800)),mh:Math.round(num(d.mh,2000,7200)),you:num(d.you,0,1e9),host:num(d.host,0,1e9),w:Math.round(num(d.w,1,1e4)),gone:Array.isArray(d.gone)?d.gone.slice(0,3000):[],fall:Array.isArray(d.fall)?d.fall.slice(0,20000):[],cr:Array.isArray(d.cr)?d.cr.slice(0,120):[]});return;}
+  if(d.e==='start'){if(isFinite(+d.seed))guestStart({br:Array.isArray(d.br)?d.br.slice(0,20):[],mn:Array.isArray(d.mn)?d.mn.slice(0,400):[],seed:+d.seed|0,mw:Math.round(num(d.mw,3000,10800)),mh:Math.round(num(d.mh,2000,7200)),you:num(d.you,0,1e9),host:num(d.host,0,1e9),w:Math.round(num(d.w,1,1e4)),gone:Array.isArray(d.gone)?d.gone.slice(0,3000):[],fall:Array.isArray(d.fall)?d.fall.slice(0,20000):[],cr:Array.isArray(d.cr)?d.cr.slice(0,120):[]});return;}
   if(d.e==='snap'){if(state==='play'||state==='pause'||state==='over'){try{applySnap(d);}catch(err){}}return;}
   if(d.e==='over'){if(state==='play')showOver(d.st,d.tank,d.why,d.w,d.cl,true);return;}
   if(d.e==='bye'){net.remote.st=0;if(state!=='hangar'){toHangar(true);toast(mateName()+' ended the battle');}coopUI();return;}
@@ -3222,6 +3252,7 @@ function guestStart(m){
   ensureAudio();toastEl.hidden=true;setMapSize(m.mw,m.mh);
   genMap(m.seed);tanks=[];tanksById={};shells=[];parts=[];floaters=[];feed=[];marks=[];nukes=[];strikes=[];craters=[];whistled.clear();
   if(Array.isArray(m.br))for(const i of m.br.slice(0,20))collapseBridge(Math.round(num(i,0,99)),null,true);
+  if(Array.isArray(m.mn))for(const i of m.mn){const q=mines[Math.round(num(i,0,9999))];if(q)q.live=false;}
   for(const id of m.gone){const o=Number.isInteger(id)?obs.find(q=>q.id===id):null;if(o)removeObs(o);}
   for(const f of m.fall){if(!Array.isArray(f))continue;const tr=Number.isInteger(f[0])?trees[f[0]]:null;if(tr){tr.fallen=true;tr.fa=num(f[1],-7,7);}}
   for(const c of m.cr){if(Array.isArray(c))craters.push({x:num(c[0],0,WW),y:num(c[1],0,WH),r:num(c[2],1,320),nuke:!!c[3],t:time});}
@@ -3341,6 +3372,7 @@ function fxApply(e,remote){
     case 'leaf':{for(let j=0;j<5;j++)parts.push({x:e.x,y:e.y,vx:rand(-40,40),vy:rand(-40,40),life:.6,max:.6,size:2.5,grow:1,color:'90,120,55',a0:.8,drag:.9});break;}
     case 'tree':{const tr=Number.isInteger(e.i)?trees[e.i]:null;if(!tr)break;if(remote){tr.fallen=true;tr.fa=e.a;}
       for(let i=0;i<8;i++)parts.push({x:tr.x+rand(-8,8),y:tr.y+rand(-8,8),vx:rand(-30,30),vy:rand(-30,30),life:1,max:1,size:3,grow:2,color:'70,95,45',a0:.8,drag:.92});break;}
+    case 'mine':{const m=mines[Math.round(num(e.i,0,9999))];if(m){if(remote)m.live=false;for(let k=0;k<12;k++)parts.push({x:m.x+rand(-10,10),y:m.y+rand(-10,10),vx:rand(-50,50),vy:rand(-50,50),life:1.6,max:1.6,size:6,grow:18,color:'110,95,70',a0:.6,drag:.93});}break;}
     case 'bridge':{if(remote)collapseBridge(Math.round(num(e.i,0,99)),null,true);for(let k=0;k<24;k++)parts.push({x:e.x+rand(-30,30),y:e.y+rand(-30,30),vx:rand(-60,60),vy:rand(-60,60),life:2,max:2,size:7,grow:22,color:'120,110,90',a0:.5,drag:.94});sfx.boom&&sfx.boom(1,1.6);break;}
     case 'obs':{if(remote){const o=obs.find(q=>q.id===e.id);if(o)removeObs(o);}
       for(let i=0;i<clamp(8+num(e.w,0,400)*num(e.h,0,400)/600,0,40);i++)parts.push({x:e.x+Math.random()*e.w,y:e.y+Math.random()*e.h,vx:rand(-40,40),vy:rand(-40,40),life:2.4,max:2.4,size:8,grow:26,color:'130,118,98',a0:.45,drag:.95});break;}
