@@ -2059,6 +2059,7 @@ function waveCleared(){
   for(const h of humans())rpFor(h,rp);
   if(wave>save.best){save.best=wave;persist();}
   for(const h of humans())if(h.alive)resupply(h);else respawn(h);
+  for(const pe of peerList())if(pe.waitSpawn&&!pe.t&&player){pe.waitSpawn=false;hotJoin(pe);}
   phase='break';phaseT=0;votes.clear();if(train&&train.stopped)train=null;
   if(tanks.some(t=>t.team==='e'&&t.air&&t.alive)){tanks=tanks.filter(t=>!(t.team==='e'&&t.air&&t.alive));sayAll('The remaining enemy aircraft turn for home','#8e8a6b');}
   if(tanks.some(t=>t.ally)){tanks=tanks.filter(t=>!t.ally);navDirty=true;sayAll('AI support heads back to base','#8e8a6b');}
@@ -3518,8 +3519,8 @@ function hostData(pe,d){
     if(first&&d.cmd){codeCall('/cmdchk',{tk:String(d.cmd).slice(0,80)}).then(r=>{if(!r||!r.ok||r.code!==net.code||!net.peers.has(pe.pid))return;pe.cmd=true;pe.name='Commander';if(pe.t){dropPeerTank(pe);}sysAll('The Commander is watching this battle');net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&player)hotJoin(pe);});}
     if(first&&d.dev){pe.dev=String(d.dev).replace(/[^a-f0-9]/g,'').slice(0,24);if(pe.dev)codeCall('/bchk',{devs:[pe.dev]}).then(r=>{if(r&&Array.isArray(r.bad)&&r.bad.includes(pe.dev)&&net.peers.has(pe.pid)){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);}});}
     if(first){const k=pe.name.toLowerCase(),back=net.away&&net.away[k],lf=net.left&&net.left[k];pe.rp=lf?lf.rp:save.rp;pe.mine=new Set(lf&&lf.mine||[]);
-      if(back){clearTimeout(back.timer);delete net.away[k];pe.rp=back.rp;pe.mine=back.mine||pe.mine;pe.stats=back.stats||pe.stats;sysAll(pe.name+' reconnected');}else{sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');}sfx.ping();}
-    if(pe.cmd)pe.name='Commander';net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
+      if(back){pe.back=true;clearTimeout(back.timer);delete net.away[k];pe.rp=back.rp;pe.mine=back.mine||pe.mine;pe.stats=back.stats||pe.stats;sysAll(pe.name+' reconnected');}else{sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');}sfx.ping();}
+    if(pe.cmd)pe.name='Commander';net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)joinOrWait(pe);pe.back=false;return;}
   if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,nh:!!d.nh,o:!!d.o,mn:!!d.mn};pe.touch=!!d.tc;return;}
   if(d.e==='act'){if(!rateOk(pe.acts,1000,8))return;const t=pe.t;if(t&&t.alive&&state==='play'&&['ext','rep','arty','ord','land','gear','nuke'].includes(d.a))doAct(t,d.a,num(d.x,0,WW),num(d.y,0,WH));return;}
   if(d.e==='vote'){if(phase==='break'&&pe.t&&state==='play'){if(votes.has(pe.pid))votes.delete(pe.pid);else votes.add(pe.pid);}return;}
@@ -3538,6 +3539,8 @@ function hostData(pe,d){
 function spawnPeerTank(pe,x,y,a){const T=pe.cmd?tget('b52d'):tget(pe.tank);if(!T||(T.admin&&!peAll(pe)&&!pe.cmd))return null;if(pe.cmd&&T.air){const F=fields[0];x=F.x+F.w*.3;y=F.y+F.h/2;}const t=makeTank(T,x,y,'p');t.cmd=!!pe.cmd;t.a=a;t.aimAt=a;t.peer=pe;pe.t=t;pe.stats=pe.stats||newStats();t.stats=pe.stats;pe.input=null;pe.lastClicks=undefined;pe.lastPicks=undefined;pe.deathCause='';tanks.push(t);return t;}
 function sendStart(pe){if(!pe.t||!player)return;const have=new Set(obs.map(o=>o.id)),gone=[];for(let i=0;i<obsTotal;i++)if(!have.has(i))gone.push(i);
   sendTo(pe,{e:'start',seed:curSeed,mw:WW,mh:WH,you:pe.t.nid,host:player.nid,w:wave,br:bridges.filter(b=>!b.up).map(b=>b.i),mn:mines.filter(m=>!m.live).map(m=>m.i),gone,fall:trees.filter(t=>t.fallen).map(t=>[t.i,r2(t.fa)]),cr:craters.slice(-100).map(c=>[r1(c.x),r1(c.y),r1(c.r),c.nuke?1:0])});}
+/* someone joining mid-wave waits for the next break (reconnecting players and the Commander come straight back) */
+function joinOrWait(pe){if(phase==='combat'&&!pe.cmd&&!pe.back){if(!pe.waitSpawn){pe.waitSpawn=true;sendTo(pe,{e:'sys',text:'A wave is in progress: you will join the battle at the next break between waves.'});sysAll((pe.name||'A player')+' will join at the next break');}return;}pe.waitSpawn=false;hotJoin(pe);}
 function hotJoin(pe){const mate=humans().find(h=>h.alive)||player;if(!mate)return;const sp=freeSpotNear(mate.x,mate.y);if(!spawnPeerTank(pe,sp.x,sp.y,mate.a))return;
   sendStart(pe);sayAll(pe.name+' joined the battle in the '+pe.t.T.name,'#8bd66e');net.lobbyKey='';sendLobby();}
 let bgTimer=null;
