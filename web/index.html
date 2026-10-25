@@ -1300,7 +1300,7 @@ function squadMid(){const hs=humans().filter(h=>h.alive);if(!hs.length)return nu
 function objPick(n){obj=null;trucks=trucks.filter(k=>!k.cv);if(net.mode==='guest'||n<2||Math.random()>.45)return;const c=squadMid();if(!c)return;
   const near=(L,lo,hi)=>L.filter(q=>{const d=Math.hypot(q.x-c.x,q.y-c.y);return d>lo&&d<hi;}).sort((a,b)=>Math.hypot(a.x-c.x,a.y-c.y)-Math.hypot(b.x-c.x,b.y-c.y))[0];
   for(const k of OBJ.slice().sort(()=>Math.random()-.5)){
-    if(k==='hold'){let h=near(hills,350,1800);if(!h){for(let i=0;i<30&&!h;i++){const a=rand(0,TAU),d=rand(600,1100),x=clamp(c.x+Math.cos(a)*d,300,WW-300),y=clamp(c.y+Math.sin(a)*d,300,WH-300);if(!blocked(x,y,60)&&!nearField(x,y,260)&&!inWater(x,y,200)&&reach[cellOf(x,y)])h={x,y,r:200};}}
+    if(k==='hold'){let h=near(hills,350,1800);if(!h){for(let i=0;i<30&&!h;i++){const a=rand(0,TAU),d=rand(600,1100),x=clamp(c.x+Math.cos(a)*d,300,WW-300),y=clamp(c.y+Math.sin(a)*d,300,WH-300);if(!blocked(x,y,60)&&!fields.some(f=>x>f.x-260&&x<f.x+f.w+260&&y>f.y-460&&y<f.y+f.h+260)&&!inWater(x,y,200)&&reach[cellOf(x,y)])h={x,y,r:200};}}
       if(!h)continue;obj={k,x:h.x,y:h.y,r:Math.min(h.r*.8,190),p:0,need:30,st:0,cn:0};}
     else if(k==='defend'){const v=near(villages,0,2000);if(!v)continue;obj={k,x:v.x,y:v.y,r:300,p:0,need:20,st:0,cn:0};}
     else{let best=null;for(let ri=0;ri<gFeat.roads.length;ri++){const rd=gFeat.roads[ri];let u=0;for(let i=1;i<rd.length;i++){const a=rd[i-1],b=rd[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]);
