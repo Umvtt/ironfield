@@ -49,6 +49,9 @@ body.playing canvas#game{cursor:none}
 .news li{overflow-wrap:anywhere}
 .live-bar{border-left-color:var(--ok,#8bd66e)}.live-bar p{margin:0;color:var(--khaki);font-size:16px;line-height:1.35;overflow-wrap:anywhere}.live-bar p.ev{color:var(--signal);font-weight:600}.live-bar p.mt{color:#ee5d50}
 .ab-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.diag{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+.diag-in{background:var(--panel2,#232a1b);border:1px solid rgba(216,207,162,.3);border-radius:6px;padding:14px;max-width:640px;width:100%;display:flex;flex-direction:column;gap:10px;color:#d8cfa2}
+.diag pre{margin:0;max-height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.45 "IBM Plex Mono",monospace;background:rgba(0,0,0,.35);padding:10px;border-radius:4px}
 .acct{margin:10px 0;padding:12px 14px;border:1px solid rgba(216,207,162,.18);background:rgba(16,19,13,.55);border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .acct .field{width:auto;flex:1 1 140px;min-width:0}.acct p{margin:0;flex-basis:100%}
 .room-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:260px;overflow:auto}
@@ -246,6 +249,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
 <form id="chatBar" class="float" hidden autocomplete="off"><input class="field" id="chatBarIn" maxlength="120" placeholder="Message your teammate (Enter sends, Esc closes)" aria-label="Chat message" enterkeyhint="send"><button class="btn small" type="submit">Send</button></form>
 <div id="toast" hidden></div>
 <div id="liveNote" hidden role="status"></div>
+<div class="diag" id="diag" hidden role="dialog" aria-label="Connection test"><div class="diag-in"><b>Connection test</b><pre id="diagOut">Testing…</pre><div class="row"><button class="btn small" id="diagCopy" type="button">Copy report</button><button class="btn ghost small" id="diagRe" type="button">Test again</button><button class="btn ghost small" id="diagX" type="button">Close</button></div></div></div>
 <div id="breakPanel" class="float" hidden>
   <div class="bp-text"><span class="tag" id="bpTag">Wave cleared</span><b id="bpTitle">Start the next wave?</b><span id="bpVotes"></span><span id="bpNews" hidden></span></div>
   <div class="row"><button class="btn small" id="voteBtn" type="button">Start wave</button><button class="btn ghost small" id="swapBtn" type="button">Change tank</button><button class="btn ghost small" id="benchBtn" type="button" hidden>Hangar</button></div>
@@ -322,7 +326,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       <label class="setting"><input type="checkbox" id="hullAim"> <span>Tank destroyers turn their hull toward your aim</span></label>
       <div class="row">
         <label class="setting"><span id="langLab">Language</span> <select class="field" id="langSel" style="width:auto;padding:4px 8px;font-size:14px"><option value="en">English</option><option value="tr">Türkçe</option></select></label>
-        <button class="btn small" id="installBtn" type="button" hidden>Install on this device</button>
+        <button class="btn ghost small" id="diagBtn" type="button">Connection test</button><button class="btn small" id="installBtn" type="button" hidden>Install on this device</button>
         <button class="btn ghost small admin" id="adminBtn" type="button">Admin: unlock all tanks</button>
         <button class="btn ghost small" id="resetBtn" type="button">Reset progress</button>
       </div>
@@ -1117,7 +1121,7 @@ const cleanBt=v=>typeof v==='string'&&/^[A-Z2-9]{10}\.[A-Z2-9]{12}$/.test(v)?v:'
 try{
   const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
   if(raw&&Array.isArray(raw.slots)){store.active=clamp(Math.round(+raw.active||0),0,SLOTS-1);store.slots=[0,1,2].map(i=>raw.slots[i]?normSave(raw.slots[i]):null);
-    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.noHull=raw.noHull?1:0;store.pub=raw.pub===0?0:1;store.ban=String(raw.ban||'').slice(0,120);const ac=raw.acct;store.acct=ac&&typeof ac==='object'&&/^[a-f0-9]{64}$/.test(ac.tk)?{tk:ac.tk,id:String(ac.id||'').replace(/[^A-Z2-9]/g,'').slice(0,12),name:cleanName(ac.name),rev:Math.round(+ac.rev||0),dirty:ac.dirty?1:0}:null;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
+    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.noHull=raw.noHull?1:0;store.newsSeen=String(raw.newsSeen||'').slice(0,320);store.pub=raw.pub===0?0:1;store.ban=String(raw.ban||'').slice(0,120);const ac=raw.acct;store.acct=ac&&typeof ac==='object'&&/^[a-f0-9]{64}$/.test(ac.tk)?{tk:ac.tk,id:String(ac.id||'').replace(/[^A-Z2-9]/g,'').slice(0,12),name:cleanName(ac.name),rev:Math.round(+ac.rev||0),dirty:ac.dirty?1:0}:null;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
   else{/* first run of this version: the old single save becomes slot 1 */
     let s=JSON.parse(localStorage.getItem('ironfield-save-v3')||'null');
     if(!s){const old=JSON.parse(localStorage.getItem('ironfield-save-v2')||'null');
@@ -1750,7 +1754,7 @@ function post(t,rep,by,src){
 }
 function kill(t,by,cause){
   if(!t.alive||t.T.immortal)return;
-  const air=t.air;t.alive=false;navDirty=true;t.burn=air?0:cause==='ammo'?14:10;if(!air)t.v=0;t.fire=0;t.diedAt=time;
+  if(t.team==='e')lastKillT=time;const air=t.air;t.alive=false;navDirty=true;t.burn=air?0:cause==='ammo'?14:10;if(!air)t.v=0;t.fire=0;t.diedAt=time;
   if(air&&!t.crash){t.crash=true;t.spin=rand(-1.6,1.6);t.killer=by;t.firing=false;}
   for(const c of t.comps)if(c.kind==='crew'&&cause!=='crew'){c.alive=false;c.hp=0;}
   const big=cause==='ammo'||cause==='french'||cause==='nuke';
@@ -1905,7 +1909,7 @@ function aiUpdate(t,dt){
     t.aimAt=Math.atan2(ty-t.y,tx-t.x);const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.05){const sol=artySolution(T,Math.hypot(tx-m.mx,ty-m.my),0,false);if(sol.ok){fireTank(t);fireArty(t,tx,ty,sol,1.8-.6*diff());}}}
 }
 /* AI allies: an AA vehicle that sticks near the squad, shoots aircraft first and ground targets it can see */
-function allyAI(t,dt){const T=t.T,A=t.ai,lead=humans().find(h=>h.alive&&!h.air)||humans().find(h=>h.alive);
+function allyAI(t,dt){if(t.hunt&&hunterAI(t,dt))return;const T=t.T,A=t.ai,lead=humans().find(h=>h.alive&&!h.air)||humans().find(h=>h.alive);
   let air=null,ad=T.radar?1300:1100;for(const o of tanks){if(!o.air||!o.alive||o.team!=='e'||o.crash)continue;const d=Math.hypot(o.x-t.x,o.y-t.y);if(d<ad){ad=d;air=o;}}
   if(lead){const d=Math.hypot(lead.x-t.x,lead.y-t.y);A.target=lead;
     if(d>320){if(!A.goal||time>A.until||Math.hypot(A.goal.x-lead.x,A.goal.y-lead.y)>250){const sp=freeSpotNear(lead.x,lead.y);setGoal(t,sp.x,sp.y);}A.wantMove=true;drive(t,dt,Math.atan2(lead.y-t.y,lead.x-t.x),d);}
@@ -1915,6 +1919,29 @@ function allyAI(t,dt){const T=t.T,A=t.ai,lead=humans().find(h=>h.alive&&!h.air)|
   A.errT-=dt;if(A.errT<=0){A.err=rand(-1,1)*(T.radar?.02:.035);A.errT=rand(.4,.8);}
   t.aimAt=Math.atan2(ly-t.y,lx-t.x)+A.err;
   if(t.canFire&&t.reload<=0&&t.rounds>0){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.06)fire(t,d);}}
+/* ================= stalemate breaker =================
+   When a wave stops moving (no enemy destroyed for 60 s with only a few left, e.g. a heavy tank nobody can penetrate
+   or a plane nobody can catch), command sends an AI hunter that can actually kill what's left: a ground vehicle whose
+   gun beats the target's armour, or missile-armed fighters for aircraft. They drive straight to it and leave when the
+   wave is won. */
+let lastKillT=0,huntN=0,huntT=0;
+function hunterAI(t,dt){const A=t.ai;let tg=null,bd=1e9;for(const o of tanks){if(o.air||!o.alive||o.team!=='e')continue;const d=Math.hypot(o.x-t.x,o.y-t.y)*(o===A.prey?.5:1);if(d<bd){bd=d;tg=o;}}
+  if(!tg)return false;A.prey=tg;const d=Math.hypot(tg.x-t.x,tg.y-t.y),los=clearLine(t.x,t.y,tg.x,tg.y);
+  if(d>420||!los){if(!A.goal||time>A.until||Math.hypot(A.goal.x-tg.x,A.goal.y-tg.y)>260){const sp=freeSpotNear(tg.x,tg.y);setGoal(t,sp.x,sp.y);A.until=time+4;}A.wantMove=true;drive(t,dt,Math.atan2(tg.y-t.y,tg.x-t.x),d);}
+  else{t.throttle=0;t.steer=0;A.wantMove=false;}
+  t.aimAir=false;A.errT-=dt;if(A.errT<=0){A.err=rand(-1,1)*.02;A.errT=rand(.4,.8);}t.aimAt=Math.atan2(tg.y-t.y,tg.x-t.x)+A.err;
+  if(los&&d<1300&&t.canFire&&t.reload<=0&&t.rounds>0){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.05)fire(t,d);}return true;}
+const armourOf=T=>Math.max(T.h[0],T.tu?T.tu[0]:0);
+function stallUpd(){if(net.mode==='guest'||phase!=='combat'||state!=='play'||spawnQueue.length)return;
+  const left=tanks.filter(t=>t.team==='e'&&t.alive&&!(t.pai&&t.pai.mode==='exit'));if(!left.length||left.length>3)return;
+  if(time-lastKillT<60||time-huntT<45||huntN>=4)return;const lead=humans().find(h=>h.alive)||player;if(!lead)return;huntT=time;huntN++;
+  const nat=lead.T.nation,gr=left.filter(t=>!t.air),air=left.filter(t=>t.air);
+  for(const e of gr.slice(0,2)){const need=armourOf(e.T)*1.05,pool=ROSTER.filter(T=>!T.air&&!T.aa&&!T.arty&&!T.admin),ok=pool.filter(T=>penAt(T,500)>=need);
+    const T=(ok.filter(T=>T.nation===nat).sort((a,b)=>a.tier-b.tier||penAt(b,500)-penAt(a,500))[0])||ok.sort((a,b)=>penAt(b,500)-penAt(a,500))[0]||ROSTER.filter(T=>!T.air&&T.admin&&!T.aa).sort((a,b)=>penAt(b,500)-penAt(a,500))[0];
+    if(!T)continue;const a=Math.atan2(lead.y-e.y,lead.x-e.x),sp=freeSpotNear(clamp(e.x+Math.cos(a)*650,120,WW-120),clamp(e.y+Math.sin(a)*650,120,WH-120)),t=makeTank(T,sp.x,sp.y,'e');
+    t.team='p';t.ally=true;t.hunt=1;t.a=Math.atan2(e.y-sp.y,e.x-sp.x);t.aimAt=t.a;tanks.push(t);navDirty=true;fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});sayAll('Stalemate: command sends an AI '+T.name+' to finish the '+e.T.name,'#8bd66e');}
+  if(air.length){const fs=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&!T.admin),msl=fs.filter(T=>T.ord&&T.ord.k==='aam'),pick=(msl.filter(T=>T.nation===nat)[0]||msl[0]||fs.sort((a,b)=>b.tier-a.tier)[0]);
+    if(pick){for(let i=0;i<2;i++)spawnPlane(pick,'p');sayAll('Stalemate: AI '+pick.name+' ×2 scrambled to bring down the last aircraft','#8bd66e');}}}
 /* when the enemy brings aircraft and nobody in the squad flies or drives anti-air, the airfield sends help */
 function spawnAllies(nP){const lead=humans().find(h=>h.alive)||player;if(!lead)return;const nat=lead.T.nation,tier=Math.min(5,lead.T.tier),near=(a,b)=>Math.abs(a.tier-tier)-Math.abs(b.tier-tier);
   const up=(a,b)=>Math.abs(a.tier-Math.min(5,tier+1))-Math.abs(b.tier-Math.min(5,tier+1))||b.tier-a.tier,fs=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&T.nation===nat&&!T.admin).sort(up),fi=fs[0];
@@ -1991,7 +2018,7 @@ function spawnPoint(){
 function startWave(n){
   wave=n;phase='combat';votes.clear();closePick();clearWrecks(true);
   weather=pickWeather(n);objPick(n);if(weather!=='clear')sayAll({rain:'Rain moves in: enemies spot you a little later',fog:'Fog rolls in: enemies only spot you up close',night:'Night falls: stay in the dark. Firing gives your position away'}[weather],'#8ab4d8');
-  waveEv=time;
+  waveEv=time;lastKillT=time;huntN=0;huntT=0;
   if(isMilestone(n)){runCp=Math.max(runCp,n);if(n>(save.checkpoint||0)){save.checkpoint=n;persist();}sayAll('Checkpoint: wave '+n+'. If you are wiped out you can continue from here.','#8bd66e');netEv({k:'cp',w:n});}
   const P=playerCount(),base=1+Math.floor((n-1)*.6),count=Math.min(Math.round(base*(1+.6*(P-1)))+(P>1?Math.floor(n/4):0),9+4*(P-1),44);
   const arty=n>=4&&Math.random()<.35;
@@ -2306,6 +2333,7 @@ function start(fromWave){
   statsHost=newStats();allDeadT=-1;menuOpen=false;net.events=[];net.input=null;net.lastClicks=undefined;net.lastPicks=undefined;
   const squad=net.mode==='host'?peerList().filter(pe=>tget(pe.tank)&&(!tget(pe.tank).admin||peAll(pe))):[];for(const pe of net.peers.values()){pe.t=null;pe.stats=null;}votes.clear();
   setMapSize(...mapDims(1+squad.length));
+  if(LIVE.news.on&&LIVE.news.text)setTimeout(()=>log('News: '+LIVE.news.text,'#f2a23a'),1500);
   const seed=(Math.random()*1e9)|0;curSeed=seed;genMap(seed);trucksReset();weather="clear";obj=null;
   const F0=fields[0];player=T.air?makeTank(T,F0.x+F0.w*.2,F0.y+F0.h/2,'p'):makeTank(T,WW/2,WH/2,'p');player.a=T.air?0:-Math.PI/2;player.aimAt=player.a;if(T.air)player.want=0;player.stats=statsHost;tanks.push(player);
   squad.forEach((pe,i)=>{const a=-Math.PI/2+(i+1)*TAU/(squad.length+1),r=110+Math.floor(i/6)*90,sp=freeSpotNear(WW/2+Math.cos(a)*r,WH/2+Math.sin(a)*r);spawnPeerTank(pe,sp.x,sp.y,-Math.PI/2);pe.stats=newStats();pe.t.stats=pe.stats;});
@@ -2399,18 +2427,39 @@ function apiWorked(i){if(i===apiIdx)return;apiIdx=i;try{localStorage.setItem('ir
 function apiNext(){const n=(codeApis||[]).length;if(n>1)apiWorked((apiIdx+1)%n);}
 async function codeCall(path,body){const L=await codeAPIs();if(!L.length)return{ok:false,reason:'setup'};
   for(let i=0;i<4;i++){const k=(apiIdx+i)%L.length;try{const r=await fetch(L[k]+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();apiWorked(k);return j;}
-    catch(e){if(i<3)await new Promise(f=>setTimeout(f,[300,900,2000][i]));}}
+    catch(e){apiErr(L[k]+path,e);if(i<3)await new Promise(f=>setTimeout(f,[300,900,2000][i]));}}
   if(net.mode==='guest'&&net.connected&&RELAY.includes(path))return relayCall(path,body);
   return{ok:false,reason:'net'};}
 /* a guest whose internet can't reach the server (some networks block it) asks the host to pass the request on */
 const RELAY=['/redeem','/badge','/verify','/bchk'];
+/* connection test: what this device can and can't reach, as a report the player can copy and send */
+const apiLog=[];function apiErr(url,e){apiLog.push(new Date().toISOString().slice(11,19)+' '+url.replace(/^https:\/\//,'')+' → '+(e&&e.name||'Error')+': '+(e&&e.message||e));if(apiLog.length>8)apiLog.shift();}
+async function probe(url,opt,ms){const t0=performance.now(),ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms||8000);
+  try{const r=await fetch(url,Object.assign({cache:'no-store',signal:ac.signal},opt||{}));const t=Math.round(performance.now()-t0);let body='';if(r.type!=='opaque'){try{body=(await r.text()).slice(0,60).replace(/\s+/g,' ');}catch(e){}}
+    return 'OK '+(r.type==='opaque'?'(reachable)':r.status)+' in '+t+' ms'+(body?' · '+body:'');}
+  catch(e){return 'FAIL after '+Math.round(performance.now()-t0)+' ms · '+(e.name==='AbortError'?'timed out':e.name+': '+e.message);}finally{clearTimeout(to);}}
+function wsProbe(url){return new Promise(res=>{const t0=performance.now();let ws;try{ws=new WebSocket(url);}catch(e){res('FAIL · '+e.message);return;}
+  const to=setTimeout(()=>{try{ws.close();}catch(e){}res('FAIL · timed out');},8000);ws.onopen=()=>{clearTimeout(to);res('OK open in '+Math.round(performance.now()-t0)+' ms');try{ws.close();}catch(e){}};
+  ws.onerror=()=>{};ws.onclose=e=>{clearTimeout(to);res('FAIL · closed (code '+e.code+') after '+Math.round(performance.now()-t0)+' ms');};});}
+async function runDiag(){const out=$('#diagOut');$('#diag').hidden=false;out.textContent='Testing… (up to 10 seconds)';codeApis=null;const L=await codeAPIs();
+  const lines=['Ironfield connection report','Build '+(MY_BUILD||'dev')+' · '+location.host+' · '+new Date().toISOString(),'Browser: '+navigator.userAgent,'Online: '+navigator.onLine+(navigator.connection?' · '+(navigator.connection.effectiveType||'')+(navigator.connection.type?' '+navigator.connection.type:''):'')+' · mode '+net.mode,'Server list: '+(L.length?L.join(' , '):'EMPTY (codes.json did not load)'),''];
+  const jobs=[['codes.json (this site)',probe('codes.json?t='+Date.now())]];
+  for(const u of L){jobs.push([u+' /config',probe(u+'/config')]);jobs.push([u+' POST /badge',probe(u+'/badge',{method:'POST',headers:{'content-type':'application/json'},body:'{"tks":[]}'})]);jobs.push([u+' live socket',wsProbe(u.replace(/^https:/,'wss:')+'/live')]);}
+  jobs.push(['cloudflare.com (any Cloudflare site)',probe('https://www.cloudflare.com/cdn-cgi/trace',{mode:'no-cors'})],['1.1.1.1 (Cloudflare by IP)',probe('https://1.1.1.1/cdn-cgi/trace',{mode:'no-cors'})],['jsdelivr (game library host)',probe('https://cdn.jsdelivr.net/npm/peerjs@1.5.4/package.json',{mode:'no-cors'})]);
+  const res=await Promise.all(jobs.map(j=>j[1]));jobs.forEach((j,i)=>lines.push(j[0]+': '+res[i]));
+  lines.push('','Live socket now: '+(liveWs?['connecting','open','closing','closed'][liveWs.readyState]:'none')+' · last good address #'+apiIdx);if(apiLog.length)lines.push('Recent failures:',...apiLog);
+  const bad=L.length&&res.slice(1,1+L.length*3).every(r=>r.startsWith('FAIL')),cf=res[res.length-3].startsWith('OK');
+  lines.push('',bad?(cf?'Result: this network reaches Cloudflare but not the game server addresses. Usually a DNS filter, ad blocker, antivirus web shield or VPN is blocking *.workers.dev and *.pages.dev. Try turning those off, or set DNS to 1.1.1.1.':'Result: this network can\'t reach Cloudflare at all. Try another network (mobile data), turn off a VPN, or set DNS to 1.1.1.1.')+' In a room, codes and badges still work through the host.':'Result: at least one server address works.');
+  out.textContent=lines.join('\n');}
+$('#diagBtn').addEventListener('click',runDiag);$('#diagRe').addEventListener('click',runDiag);$('#diagX').addEventListener('click',()=>{$('#diag').hidden=true;});
+$('#diagCopy').addEventListener('click',()=>{const t=$('#diagOut').textContent;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Report copied: paste it to the owner'),()=>{const r=document.createRange();r.selectNodeContents($('#diagOut'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);toast('Select all and copy the report');});});
 function relayCall(path,body){body=Object.assign({},body);delete body.tk;const id=net.rq=(net.rq||0)+1;netSend({e:'api',id,p:path,b:body});
   return new Promise(res=>{const W=net.rqW||(net.rqW=new Map());const t=setTimeout(()=>{W.delete(id);res({ok:false,reason:'net'});},15000);W.set(id,r=>{clearTimeout(t);W.delete(id);res(r&&typeof r==='object'?r:{ok:false,reason:'net'});});});}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
 async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
   const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name,tk:store.acct?store.acct.tk:undefined});
-  if(!r||!r.ok){msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
-  const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],slot=()=>net.mode==='host'?save:store.slots[store.active]||(store.slots[store.active]=freshSave()),inRoom=net.mode==='guest'&&net.connected,where=()=>inRoom?' (this room and slot '+(store.active+1)+')':net.mode==='host'&&net.temp?' (this session)':' in slot '+(store.active+1);
+  if(!r||!r.ok){if(r&&(r.reason==='net'||r.reason==='setup')){msg.textContent='Can\'t reach the code server. ';const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Why?';b.onclick=runDiag;msg.append(b);return;}msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
+  const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],mpSlot=net.mode==='off'&&hangarMode==='mp'&&/^[0-2]$/.test(($('#hostSave')||{}).value||'')?+$('#hostSave').value:store.active,slot=()=>net.mode==='host'?save:store.slots[mpSlot]||(store.slots[mpSlot]=freshSave()),inRoom=net.mode==='guest'&&net.connected,where=()=>inRoom?' (this room and slot '+(store.active+1)+')':net.mode==='host'&&net.temp?' (this session)':' in slot '+(mpSlot+1);
   if(inRoom&&perks.some(k=>/^(rp|veh):/.test(k)))netSend({e:'perk',tk:cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket})});
   for(const k of perks){if(typeof k!=='string')continue;
     if(k==='all_vehicles'){PERK.all=true;net.perkTk=cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket});if(net.mode==='guest'&&net.connected)netSend({e:'perk',tk:net.perkTk});done.push('Every vehicle until you close the game');}
@@ -2434,14 +2483,15 @@ function applyLive(c,pushed){const n=c.news||{},rp=c.rp||{},m=c.maint||{},old=LI
   renderLive();lockNames();
   if(liveSeen&&LIVE.bv!==old.bv){const tks=[store.badge].concat(peerList().map(p=>p.bt),net.squad.map(r=>r[4])).filter(Boolean);for(const tk of tks)BADGE.delete(tk);checkBadges(tks);}
   if(liveSeen){const notes=[],nm=rpMul(),om=old.rp.mul>1&&(!old.rp.until||Date.now()<old.rp.until)?old.rp.mul:1;
-    if(LIVE.news.on&&LIVE.news.text&&(!old.news.on||old.news.text!==LIVE.news.text||old.news.id!==LIVE.news.id))notes.push(['News',LIVE.news.text]);
+
     if(nm!==om)notes.push(nm>1?[(nm===2?'Double':nm===3?'Triple':nm+'×')+' RP','event started: kills and waves pay more']:['RP event','has ended']);
     if(LIVE.maint.on&&!old.maint.on)notes.push(['Maintenance',(LIVE.maint.text||'Multiplayer is closing for maintenance.')+(net.mode!=='off'?' Your battle carries on.':'')]);
     if(!LIVE.maint.on&&old.maint.on)notes.push(['Multiplayer','is open again']);
     if(notes.length)liveNote(notes);}
   if(LIVE.maint.on&&(!old.maint.on||!liveSeen)&&(net.mode!=='off'||state!=='hangar'))maintKick();
-  liveSeen=true;
+  liveSeen=true;newsPop();
   if(MY_BUILD&&MP_OK&&+MY_BUILD<LIVE.minBuild)needUpdate();}
+function newsPop(){const n=LIVE.news,k=n.id||n.text;if(!n.on||!n.text||store.newsSeen===k)return;store.newsSeen=k;persist();liveNote([['News',n.text]]);}
 function maintKick(){const msg=LIVE.maint.text||'Ironfield is down for maintenance. We\'ll be back soon.';
   try{if(net.mode!=='off')leaveCoop();if(state!=='hangar')toHangar();}catch(e){}liveNote([['Maintenance',msg]]);coopStatus(msg,true);}
 async function needUpdate(){const b=await latestBuild();if(!b||+b<LIVE.minBuild)return;
@@ -2518,7 +2568,7 @@ async function acctLoad(){const a=store.acct;if(!a)return;const r=await acctCall
   else if(r&&(r.reason==='signin'||r.reason==='ban')){store.acct=null;persist();toast(ACCT_ERR[r.reason]);}renderAcct();}
 function acctName(){const a=store.acct;if(!a||!a.name)return;const mine=store.badge&&BADGE.get(store.badge);if(mine&&mine.nm)return;if(store.name!==a.name){store.name=a.name;nameIn.value=a.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();}nameIn.readOnly=true;nameIn.title='Your callsign is your account name';}
 async function acctGo(reg){const m=$('#acMsg'),name=cleanName($('#acName').value),pw=$('#acPw').value;m.textContent='…';
-  const r=await acctCall(reg?'reg':'login',{name,pw,bt:store.badge});if(!r||!r.ok){m.textContent=ACCT_ERR[r&&r.reason]||'Something went wrong';return;}
+  const r=await acctCall(reg?'reg':'login',{name,pw,bt:store.badge});if(!r||!r.ok){m.textContent=ACCT_ERR[r&&r.reason]||'Something went wrong';if(r&&(r.reason==='net'||r.reason==='setup')){const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Why?';b.onclick=runDiag;m.append(' ',b);}return;}
   store.acct={tk:r.tk,id:r.id,name:r.name,rev:r.rev||0,dirty:0};
   if(r.bt&&!store.badge){store.badge=r.bt;BADGE.delete(r.bt);checkBadges([r.bt]);}else if(store.badge&&!r.bt)acctCall('bt',{tk:r.tk,bt:store.badge});
   if(r.save){try{localStorage.setItem(STORE_KEY+'-local',JSON.stringify(store.slots));}catch(e){}adoptCloud(r.save,r.rev);toast('Signed in as '+r.name+': your cloud save is loaded');}
@@ -2710,7 +2760,7 @@ let swarmK=1;
 function fireSlot(p){const L=p.shotAt||(p.shotAt=[]);while(L.length&&time-L[0]>1.6)L.shift();return L.length<(swarmK>1.3?2:3);}
 function swarmUpd(){if(net.mode==='guest')return;let e=0,f=0;for(const t of tanks){if(!t.alive||t.air)continue;if(t.team==='e')e++;else if(t.team==='p')f++;}const r=e/Math.max(1,f);swarmK+=(clamp(1+(r-2.5)*.1,1,1.8)-swarmK)*.05;}
 function update(dt){
-  time+=dt;nukeCD=Math.max(0,nukeCD-dt);swarmUpd();
+  time+=dt;nukeCD=Math.max(0,nukeCD-dt);swarmUpd();stallUpd();
   playerInput(dt);
   {let alive=0;for(const t of tanks)if(t.team==='e'&&t.alive)alive++;const cap=12+3*playerCount();for(const q of spawnQueue.slice())if(time>=q.at){if(alive>=cap&&!q.air){q.at=time+1;continue;}spawnQueue.splice(spawnQueue.indexOf(q),1);if(q.air)spawnPlane(q.T);else spawnEnemy(q.T);alive++;}}
   if(save.frBoom){frenchT+=dt;if(frenchT>=10){frenchT-=10;for(const t of tanks.slice())if(t.alive&&t.T.nation==='fra'&&Math.random()<.2){kill(t,null,'french');say(t,'Your '+t.T.name+' spontaneously exploded. French engineering.','#ee5d50');}}}
@@ -3288,7 +3338,7 @@ function coopStatus(text,err){const el=$('#coopStatus');el.textContent=text;el.c
 function sendLobby(force){if(net.mode!=='host')return;const list=peerList(),seen=new Set([store.badge]);for(const pe of list){pe.btOk=pe.bt&&!seen.has(pe.bt)?pe.bt:'';if(pe.btOk)seen.add(pe.bt);}
   const sq=[[store.name,save.sel,0,state==='hangar'?0:1,store.badge]].concat(list.map(pe=>[pe.name||'Guest',pe.tank||'m4a1',1,pe.t?1:0,pe.btOk]));
   const bl={};for(const r of sq){const v=r[4]&&BADGE.get(r[4]);if(v&&typeof v==='object')bl[r[4]]={l:v.l,n:v.nm,ab:[...v.ab]};}
-  const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq,bl},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
+  const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq,bl,nw:LIVE.news.on&&LIVE.news.text?[LIVE.news.text,LIVE.news.id]:0},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
     k=JSON.stringify([base,pfs]);if(!force&&k===net.lobbyKey)return;net.lobbyKey=k;
   list.forEach((pe,i)=>sendTo(pe,Object.assign({},base,{me:i+1,pf:pfs[i]})));}
 function fillHostSave(){const el=$('#hostSave');if(!el||net.mode!=='off')return;const was=el.value;el.textContent='';
@@ -3360,7 +3410,8 @@ function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
 let livePoll=Date.now();liveCfg().then(()=>{liveConnect();if(store.acct){acctName();acctLoad();}});renderAcct();roomsPoll();
-setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>60000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},15000);checkBadges([store.badge]);
+setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>45000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},20000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-livePoll>5000){livePoll=Date.now();liveCfg();}});checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   if(store.ban){coopStatus('This device is banned from multiplayer'+(store.ban!=='banned'?': '+store.ban:''),true);return;}
@@ -3496,6 +3547,7 @@ function guestData(d){
     /* the host already checked these badges with the server, so they show even when this device can't reach it */
     if(d.bl&&typeof d.bl==='object')for(const r of net.squad){const v=r[4]&&d.bl[r[4]];if(v&&typeof v==='object'&&typeof BADGE.get(r[4])!=='object'||v&&BADGE.get(r[4])==='p')BADGE.set(r[4],{l:cleanName(v.l),nm:cleanName(v.n),n:nkey(v.n),ab:new Set((Array.isArray(v.ab)?v.ab:[]).filter(x=>['nuke','admin','kick','vote'].includes(x)))});}
     checkBadges(net.squad.map(r=>r[4]));
+    if(Array.isArray(d.nw)&&!liveSeen){LIVE.news={on:true,text:liveTxt(d.nw[0],300),id:liveTxt(d.nw[1],20)};renderLive();newsPop();}
     net.meIdx=Math.round(num(d.me,-1,MAX_PLAYERS));const h=net.squad[0];if(h){net.remote.name=h[0];net.remote.tank=h[1];}net.remote.st=d.st?1:0;net.remote.fr=d.fr?1:0;coopUI();return;}
   if(d.e==='chat'){const t=cleanText(d.text);if(!t)return;addChat(cleanName(d.from)||'Player',t,'them');sfx.ping();return;}
   if(d.e==='sys'){const t=cleanText(d.text);if(t)addChat(null,t,'sys');return;}
@@ -3510,6 +3562,7 @@ function guestData(d){
   if(d.e==='full'){toast('That room is full');leaveCoop();coopStatus('That room already has '+MAX_PLAYERS+' players.',true);return;}
 }
 function guestStart(m){
+  if(LIVE.news.on&&LIVE.news.text)setTimeout(()=>log('News: '+LIVE.news.text,'#f2a23a'),1500);
   ensureAudio();toastEl.hidden=true;setMapSize(m.mw,m.mh);
   genMap(m.seed);tanks=[];tanksById={};shells=[];parts=[];floaters=[];feed=[];marks=[];nukes=[];strikes=[];craters=[];whistled.clear();
   if(Array.isArray(m.br))for(const i of m.br.slice(0,20))collapseBridge(Math.round(num(i,0,99)),null,true);
