@@ -726,16 +726,27 @@ function gunnersFire(t,dt){const mine=t.team==='p';t.gunnerT=(t.gunnerT||0)-dt;i
   const tg=t.T.tg||12.7;fx({k:'muzp',x:r1(t.x),y:r1(t.y),a:r3(a),n:t.nid,c:tg});const g={c:tg,pe:tg>=20?22:tg>=12?25:9,d:(tg>=20?9:tg>=12?6:4)*n*(mine?1.45:1),fr:4};shells.push({kind:'bullet',x:t.x,y:t.y,vx:Math.cos(a)*sp+t.vx,vy:Math.sin(a)*sp+t.vy,owner:t,T:t.T,g,dist:0,maxD:mine?600:470,ground:false,gunner:true,lastTree:null,penMul:1});}
 function planeOrd(t){const T=t.T;if(!t.air||!t.alive)return;if(!T.ord){say(t,'This aircraft carries no bombs or rockets','#8e8a6b');return;}
   if(t.ordLeft<=0){say(t,T.ord.lab+': rearming, '+Math.ceil(t.ordCD)+' s','#8e8a6b');return;}if(t.dropCD>0||t.stick>0)return;
-  if(T.ord.k==='rocket'){const n=Math.min(2,t.ordLeft);for(let i=0;i<n;i++)fireRocket(t,i?1:-1);t.ordLeft-=n;t.dropCD=.35;}
+  if(T.ord.k==='aar'){const n=Math.min(4,t.ordLeft);for(let i=0;i<n;i++)fireAAR(t,i%2?1:-1,i);t.ordLeft-=n;t.dropCD=.5;}
+  else if(T.ord.k==='aam'){let tg=t.lk&&t.lk.alive?t.lk:null;if(!tg&&t.pai&&t.pai.tgt&&t.pai.tgt.air)tg=t.pai.tgt;fireAAM(t,tg);t.ordLeft--;t.dropCD=t.team==='e'?3.5:.7;}
+  else if(T.ord.k==='rocket'){const n=Math.min(2,t.ordLeft);for(let i=0;i<n;i++)fireRocket(t,i?1:-1);t.ordLeft-=n;t.dropCD=.35;}
   else{const n=T.cls==='bomber'?Math.min(T.ord.n>=60?8:T.ord.n>=30?5:T.ord.n>=10?4:T.ord.n>=6?3:2,t.team==='e'?3:99,t.ordLeft):1;t.stick=n;}
   if(t.ordLeft<=0&&!t.stick)t.ordCD=T.re;}
 function dropOne(t){const T=t.T,sc=t.team==='p'?12:45;t.ordLeft--;shells.push({kind:'bomb',x:t.x,y:t.y,vx:t.vx*.92+rand(-sc,sc),vy:t.vy*.92+rand(-sc,sc),owner:t,T,f:T.ord.f,t:0,tof:BOMB_TOF});if(t.ordLeft<=0)t.ordCD=T.re;fx({k:'whistle',d:1.1});}
+/* air-to-air rockets: unguided, fired in ripples of four, burst next to any enemy aircraft they pass (proximity fuze) */
+function fireAAR(t,side,i){const T=t.T,c=Math.cos(t.a),s=Math.sin(t.a),off=T.S*.2*side,a=t.a+rand(-.03,.03)+(i>1?side*.015:0),sp=820+t.v;
+  shells.push({kind:'aar',x:t.x+c*T.L*.1-s*off,y:t.y+s*T.L*.1+c*off,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,owner:t,T,f:T.ord.f,dist:0,maxD:1000,arm:t.alt<.75});}
+/* homing missiles: follow the locked aircraft with a limited turn rate, so a hard turn can still shake them */
+function fireAAM(t,tg){const T=t.T,c=Math.cos(t.a),s=Math.sin(t.a),side=t.ordLeft%2?1:-1,off=T.S*.25*side,sp=880+t.v;
+  shells.push({kind:'aam',x:t.x+c*T.L*.1-s*off,y:t.y+s*T.L*.1+c*off,vx:c*sp,vy:s*sp,sp,owner:t,T,f:T.ord.f,dist:0,maxD:3200,tgt:tg||null,tr:t.team==='e'?2.1:3.1});
+  if(tg&&isHuman(tg))tg.mslT=time;fx({k:'whistle',d:.6});}
 function fireRocket(t,side){const T=t.T,c=Math.cos(t.a),s=Math.sin(t.a),off=T.S*.22*side,sp0=t.team==='p'?.02:.035,a=t.a+rand(-sp0,sp0),sp=700+t.v;
   shells.push({kind:'rocket',x:t.x+c*T.L*.1-s*off,y:t.y+s*T.L*.1+c*off,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,owner:t,T,f:T.ord.f,dist:0,maxD:640,arm:t.alt<.75});}
 /* ---- damage ---- */
 function planeComp(t,x,y){const T=t.T;const w=[];for(const c of t.comps){if(c.kind==='crew'&&!c.alive)continue;let k=c.kind==='crew'?(c.role==='pilot'?.09:.07):c.type==='wing'?.2:c.type==='engine'?.17/Math.max(1,T.eng*.6):c.type==='tail'?.11:.11;w.push([c,k]);}
   let r=Math.random()*(w.reduce((a,b)=>a+b[1],0)+.08);for(const[c,k]of w){r-=k;if(r<=0)return c;}return null;}
-function planeHit(t,dmg,pe,by,kind){if(!t.alive||!t.air||t.T.immortal)return false;const T=t.T,rep=newReport(),n=kind==='flak'?2:1;if(kind==='flak1')kind='flak';
+/* a plane of ours parked on our runway (being serviced) can't be hurt and isn't a target */
+const onPad=t=>!!t&&t.air&&t.team==='p'&&!!t.landed;
+function planeHit(t,dmg,pe,by,kind){if(!t.alive||!t.air||t.T.immortal||onPad(t))return false;const T=t.T,rep=newReport(),n=kind==='flak'?2:1;if(kind==='flak1')kind='flak';
   if(t.team==='p'&&!t.pai)dmg*=.75;else if(t.pai)dmg*=.85;t.hitT=time;
   for(let i=0;i<n;i++){const c=planeComp(t);if(!c)continue;let d=dmg*rand(.7,1.3);if(T.ar&&(c.role==='pilot'||c.type==='engine')&&pe<T.ar*1.2)d*=.25;hurt1(t,c,d,rep);}
   t.lastHitBy=by;if(by&&by.stats&&kind!=='flak')by.stats.hits++;
@@ -782,6 +793,16 @@ function updAirShells(s,dt){
     if(Math.random()<.8)parts.push({x:ax,y:ay,vx:rand(-8,8),vy:rand(-8,8),life:.8,max:.8,size:2.5,grow:9,color:'200,196,184',a0:.35,drag:.94});
     if(s.dist>90){for(const t of tanks){if(t.air||!t.alive||t===s.owner||(s.owner&&t.team===s.owner.team))continue;if(segCircle(ax,ay,s.x,s.y,t.x,t.y,t.T.W*.6)>=0){explosion(s.x,s.y,s.f,s.owner,{direct:t,mul:s.owner&&s.owner.team==='e'?.85:1});return true;}}}
     if(s.dist>=s.maxD||s.x<0||s.y<0||s.x>WW||s.y>WH){explosion(s.x,s.y,s.f,s.owner);return true;}return false;}
+  if(s.kind==='aar'||s.kind==='aam'){
+    if(s.kind==='aam'){const g=s.tgt;if(g&&(!g.alive||!g.air||g.crash||onPad(g)))s.tgt=null;
+      if(s.tgt){const sp=s.sp,lt=Math.hypot(g.x-s.x,g.y-s.y)/sp,want=Math.atan2(g.y+g.vy*lt-s.y,g.x+g.vx*lt-s.x),h=Math.atan2(s.vy,s.vx),e=norm(want-h);
+        if(Math.abs(e)>1.5)s.tgt=null;else{const nh=h+clamp(e,-s.tr*dt,s.tr*dt);s.vx=Math.cos(nh)*sp;s.vy=Math.sin(nh)*sp;if(isHuman(g))g.mslT=time;}}}
+    const sx=s.vx*dt,sy=s.vy*dt,ax=s.x,ay=s.y;s.x+=sx;s.y+=sy;s.dist+=Math.hypot(sx,sy);
+    if(Math.random()<.9)parts.push({x:ax,y:ay,vx:rand(-6,6),vy:rand(-6,6),life:s.kind==='aam'?1.2:.8,max:1.2,size:2.2,grow:8,color:'220,218,208',a0:.4,drag:.95});
+    if(s.dist>60){for(const t of tanks){if(!t.air||!t.alive||t.crash||t===s.owner||(s.owner&&t.team===s.owner.team)||onPad(t))continue;
+        if(segCircle(ax,ay,s.x,s.y,t.x,t.y,t.T.hitR+(s.kind==='aam'?20:15))>=0){planeHit(t,s.kind==='aam'?240:clamp(30+Math.sqrt(s.f)*2.2,40,140),s.kind==='aam'?60:40,s.owner,'flak');fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.kind==='aam'?60:40});return true;}}}
+    if(s.kind==='aar'&&s.dist>90){for(const t of tanks){if(t.air||!t.alive||(s.owner&&t.team===s.owner.team))continue;if(segCircle(ax,ay,s.x,s.y,t.x,t.y,t.T.W*.6)>=0){explosion(s.x,s.y,s.f,s.owner,{direct:t});return true;}}}
+    if(s.dist>=s.maxD||s.x<0||s.y<0||s.x>WW||s.y>WH){fx({k:'flak',x:r1(s.x),y:r1(s.y),c:20});return true;}return false;}
   if(s.kind==='bullet'){const sx=s.vx*dt,sy=s.vy*dt,ax=s.x,ay=s.y;s.x+=sx;s.y+=sy;s.dist+=Math.hypot(sx,sy);
     if(shotVsPlanes(s,ax,ay,s.x,s.y))return true;
     if(s.ground&&s.dist>70&&!s.gunner){for(const t of tanks){if(t.air||!t.alive||(s.owner&&t.team===s.owner.team))continue;if(inTank(t,s.x,s.y,2))return strafeTank(t,s);}
@@ -973,7 +994,7 @@ function drawPlane(g,t){const T=t.T,dead=!t.alive&&!t.crash;
   drawPlaneShape(g,t,'#000',false,true);g.restore();
   g.save();g.translate(t.x,t.y);g.rotate(t.a);g.scale(sc,sc*(1-Math.abs(t.bank||0)*.22));const paint=t.team==='e'?T.ePaint:T.paint;drawPlaneShape(g,t,paint,dead);g.restore();}
 function drawAirShell(s){if(s.kind==='bullet'){const sp=Math.hypot(s.vx,s.vy)||1,len=26,lx=s.x-s.vx/sp*len,ly=s.y-s.vy/sp*len;ctx.strokeStyle=s.g&&s.g.c>=20?'rgba(255,200,120,.95)':'rgba(255,236,180,.85)';ctx.lineWidth=s.g&&s.g.c>=20?2.2:1.4;ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(s.x,s.y);ctx.stroke();return;}
-  if(s.kind==='rocket'){const sp=Math.hypot(s.vx,s.vy)||1;ctx.fillStyle='#d8cfa2';ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(s.vy,s.vx));ctx.fillRect(-7,-1.5,9,3);ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(255,180,80,.9)';ctx.beginPath();ctx.arc(-8,0,2.5,0,TAU);ctx.fill();ctx.restore();ctx.globalCompositeOperation='source-over';return;}
+  if(s.kind==='rocket'||s.kind==='aar'||s.kind==='aam'){const sp=Math.hypot(s.vx,s.vy)||1;ctx.fillStyle=s.kind==='aam'?'#f2f2ec':'#d8cfa2';ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(s.vy,s.vx));ctx.fillRect(-7,-1.5,9,3);ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(255,180,80,.9)';ctx.beginPath();ctx.arc(-8,0,2.5,0,TAU);ctx.fill();ctx.restore();ctx.globalCompositeOperation='source-over';return;}
   if(s.kind==='bomb'){const k=clamp(s.t/s.tof,0,1),lift=(1-k*k)*60;ctx.fillStyle='rgba(0,0,0,'+(.2+.35*k)+')';ctx.beginPath();ctx.ellipse(s.x,s.y,3+3*k,2+2*k,0,0,TAU);ctx.fill();
     ctx.save();ctx.translate(s.x+lift*.6,s.y+lift*.8);ctx.rotate(Math.atan2(s.vy,s.vx));ctx.fillStyle='#3a3d30';ctx.beginPath();ctx.ellipse(0,0,7,3,0,0,TAU);ctx.fill();ctx.fillRect(-9,-3,3,6);ctx.restore();}}
 
@@ -1043,10 +1064,10 @@ const flagImg=n=>'<img class="flag" src="'+FLAG_URL[n]+'" alt="'+NAT[n].name+' f
 /* ================= save ================= */
 const STORE_KEY='ironfield-v4',SLOTS=3;
 const STARTERS=ROSTER.filter(T=>T.start).map(T=>T.id);
-const freshSave=()=>({rp:0,owned:STARTERS.slice(),earned:STARTERS.slice(),sel:'m4a1',best:0,nation:'usa',frBoom:true,checkpoint:0,startAt:1});
+const freshSave=()=>({rp:0,owned:STARTERS.slice(),earned:STARTERS.slice(),sel:'m4a1',best:0,nation:'usa',frBoom:false,checkpoint:0,startAt:1});
 /* every profile (solo slots and the co-op profile) goes through the same clean-up, so a hand-edited or old save can't break the game */
 function normSave(s){const o=freshSave();if(!s||typeof s!=='object'||!Array.isArray(s.owned))return o;
-  o.rp=Math.max(0,Math.floor(+s.rp||0));o.best=Math.max(0,Math.floor(+s.best||0));o.frBoom=s.frBoom!==false;
+  o.rp=Math.max(0,Math.floor(+s.rp||0));o.best=Math.max(0,Math.floor(+s.best||0));o.frBoom=s.frBoom===true;
   o.owned=[...new Set(s.owned.filter(id=>TYPE[id]))];for(const id of STARTERS)if(!o.owned.includes(id))o.owned.push(id);
   const e=Array.isArray(s.earned)?s.earned:(o.owned.includes('ratte')?STARTERS.slice():o.owned.slice());
   o.earned=[...new Set(e.filter(id=>TYPE[id]&&!TYPE[id].admin&&o.owned.includes(id)))];for(const id of STARTERS)if(!o.earned.includes(id))o.earned.push(id);
@@ -1059,7 +1080,7 @@ const cleanBt=v=>typeof v==='string'&&/^[A-Z2-9]{10}\.[A-Z2-9]{12}$/.test(v)?v:'
 try{
   const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
   if(raw&&Array.isArray(raw.slots)){store.active=clamp(Math.round(+raw.active||0),0,SLOTS-1);store.slots=[0,1,2].map(i=>raw.slots[i]?normSave(raw.slots[i]):null);
-    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
+    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
   else{/* first run of this version: the old single save becomes slot 1 */
     let s=JSON.parse(localStorage.getItem('ironfield-save-v3')||'null');
     if(!s){const old=JSON.parse(localStorage.getItem('ironfield-save-v2')||'null');
@@ -1070,6 +1091,7 @@ try{
 if(!store.slots[store.active])store.slots[store.active]=freshSave();
 if(!store.coop)store.coop=freshSave();
 if(!store.name)store.name='Tanker-'+(100+Math.floor(Math.random()*900));
+if(!store.frOff){store.frOff=1;for(const sl of store.slots)if(sl)sl.frBoom=false;}
 if(!store.dev)store.dev=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
 let save=store.slots[store.active];
 function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(store));}catch(e){}}
@@ -1114,7 +1136,7 @@ const CRATER_LIFE=8;
 let fields=[],depots=[],fuelQ=[],obs=[],obsAll=[],rubble=[],trees=[],craters=[],tanks=[],shells=[],parts=[],floaters=[],feed=[],marks=[],nukes=[],strikes=[];
 let player=null,state='hangar',wave=0,phase='combat',phaseT=0,spawnQueue=[],kills=0,battleRP=0,shotsF=0,shotsHit=0,shotsPen=0,deadT=0,deathCause='';
 let votes=new Set(),gVotes={n:0,of:1,me:false,need:1},runCp=1,pickOpen=false,pickNation=null,curSeed=1,obsTotal=0,nidSeq=1,shellSeq=1,myNid=0,hostNid=0,statsHost={shots:0,hits:0,pens:0,kills:0,rp:0},allDeadT=-1,menuOpen=false,tanksById={},gLeft=0;const whistled=new Set();
-function targets(){const out=humans();for(const t of tanks)if(t.ally&&t.alive)out.push(t);return out;}
+function targets(){const out=humans().filter(h=>!onPad(h));for(const t of tanks)if(t.ally&&t.alive&&!onPad(t))out.push(t);return out;}
 const foesOf=t=>t.team==='e'?targets():tanks.filter(o=>o.team==='e'&&o.alive);
 function humans(){const out=player?[player]:[];if(net.mode==='host')for(const pe of net.peers.values())if(pe.open&&pe.t)out.push(pe.t);return out;}
 const isHuman=t=>!!t&&(t===player||!!t.peer);
@@ -2129,7 +2151,7 @@ async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase()
     else if(/^rp:\d{1,7}$/.test(k)){const n=clamp(+k.slice(3),1,1e6);slot().rp+=n;persist();done.push('+'+fmt(n)+' RP in slot '+(store.active+1));}
     else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){const sl=slot();if(!sl.owned.includes(T.id))sl.owned.push(T.id);if(!sl.earned.includes(T.id))sl.earned.push(T.id);persist();done.push(T.name+' unlocked in slot '+(store.active+1));}else done.push('That vehicle is not in this version of the game');}
     else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;const bn=cleanName(r.name);if(bn){store.name=bn;if(nameIn)nameIn.value=bn;}persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,ao:(store.abOff||[]).join(',')});
-      done.push((cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op');}}
+      done.push(r.again?'Your '+(cleanName(r.label)||'Creator')+' badge and the callsign '+store.name+' are back on this device':(cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op. Keep this code: it brings the badge back on any device.');}}
   $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent=done.join(' · ')||'Done';fixSel();renderHangar();coopUI();if(net.mode==='host')sendLobby(true);}
 /* live settings from the server (news, RP events, maintenance, oldest build allowed), refreshed every 5 minutes */
 let LIVE={news:{on:false,text:''},rp:{mul:1,until:0},maint:{on:false,text:''},minBuild:0,names:new Set(),bv:0};
@@ -2231,7 +2253,7 @@ function renderSlots(){const box=$('#slots');box.textContent='';
     b.append(tag,big,sub);b.addEventListener('click',()=>pickSlot(i));box.append(b);}}
 const nameIn=$('#nameIn');nameIn.value=store.name;
 nameIn.addEventListener('input',()=>{const v=cleanName(nameIn.value);if(v&&nameOk(store.badge,v)){store.name=v;persist();renderSquad();}});
-nameIn.addEventListener('change',()=>{const v=cleanName(nameIn.value);if(v&&!nameOk(store.badge,v))toast('That callsign belongs to a badge holder');else if(v)store.name=v;nameIn.value=store.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();});
+nameIn.addEventListener('change',()=>{const v=cleanName(nameIn.value);if(v&&!nameOk(store.badge,v))toast('That callsign belongs to a badge holder. If it\'s yours, enter your badge code again (Multiplayer → code)');else if(v)store.name=v;nameIn.value=store.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();});
 nameIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();nameIn.blur();}});
 
 /* guests research at once on their own room profile; the host applies the same to its copy (pe.rp/pe.mine) */
@@ -2360,7 +2382,7 @@ function update(dt){
       artyWhistle(s);
       if(s.t>=s.tof){shells.splice(i,1);artyImpact(s);}
       continue;}
-    if(s.kind==='bullet'||s.kind==='rocket'||s.kind==='bomb'){if(!(isFinite(s.x)&&isFinite(s.y))||updAirShells(s,dt/2)||updAirShells(s,dt/2)){const j=shells.indexOf(s);if(j>=0)shells.splice(j,1);}continue;}
+    if(s.kind==='bullet'||s.kind==='rocket'||s.kind==='bomb'||s.kind==='aar'||s.kind==='aam'){if(!(isFinite(s.x)&&isFinite(s.y))||updAirShells(s,dt/2)||updAirShells(s,dt/2)){const j=shells.indexOf(s);if(j>=0)shells.splice(j,1);}continue;}
     let dead=!(isFinite(s.x)&&isFinite(s.y)&&isFinite(s.vx)&&isFinite(s.vy))||Math.hypot(s.vx,s.vy)<20;
     for(let k=0;k<4&&!dead;k++){const sx=s.vx*dt/4,sy=s.vy*dt/4,px0=s.x,py0=s.y;s.x+=sx;s.y+=sy;s.dist+=Math.hypot(sx,sy);const am=s.T.am;
       if(s.x<0||s.y<0||s.x>WW||s.y>WH){dead=true;break;}
@@ -2581,7 +2603,7 @@ function draw(dt){
   else for(const tr of trees){if(tr.fallen||!vis(tr.x,tr.y,tr.r))continue;let a=1;if(player&&!player.air&&Math.hypot(player.x-tr.x,player.y-tr.y)<tr.r+player.T.R*.6)a=.4;drawTree(tr,a);}
   ctx.lineCap='round';
   for(const s of shells){
-    if(s.kind==='bullet'||s.kind==='rocket'||s.kind==='bomb'){if(vis(s.x,s.y,40))drawAirShell(s);continue;}
+    if(s.kind==='bullet'||s.kind==='rocket'||s.kind==='bomb'||s.kind==='aar'||s.kind==='aam'){if(vis(s.x,s.y,40))drawAirShell(s);continue;}
     if(s.kind==='arty'){const lift=s.h*.6,hk=clamp(lift/400,0,1);ctx.fillStyle='rgba(0,0,0,'+(.45-.3*hk)+')';ctx.beginPath();ctx.ellipse(s.x,s.y,3+hk*7,2+hk*4,0,0,TAU);ctx.fill();
       if(lift<900){const vx=(s.x1-s.x0)/s.tof,vy=(s.y1-s.y0)/s.tof,dl=.6*(s.v*Math.sin(s.th)-G*s.t),hx=s.x,hy=s.y-lift,tx=hx-vx*.09,ty=hy+dl*.09*6,r0=2.2+s.T.c/140;
         const gr=ctx.createLinearGradient(tx,ty,hx,hy);gr.addColorStop(0,'rgba(255,220,160,0)');gr.addColorStop(1,'rgba(255,220,160,.85)');ctx.strokeStyle=gr;ctx.lineWidth=r0*1.4;ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(hx,hy);ctx.stroke();
@@ -3178,7 +3200,7 @@ function guestUpdate(dt){
 function packShell(q){
   if(q.kind==='arty')return[1,r1(q.x0),r1(q.y0),r1(q.x1),r1(q.y1),r2(q.t),r2(q.tof),q.v,r3(q.th),q.T.id,(q.owner&&q.owner.nid)||(q.caller&&q.caller.nid)||0,q.id];
   if(q.kind==='direct')return[0,r1(q.x),r1(q.y),Math.round(q.vx),Math.round(q.vy),q.T.id];
-  if(q.kind==='bullet'||q.kind==='rocket')return[q.kind==='bullet'?2:3,r1(q.x),r1(q.y),Math.round(q.vx),Math.round(q.vy),q.T.id];
+  if(q.kind==='bullet'||q.kind==='rocket'||q.kind==='aar'||q.kind==='aam')return[q.kind==='bullet'?2:3,r1(q.x),r1(q.y),Math.round(q.vx),Math.round(q.vy),q.T.id];
   if(q.kind==='bomb')return[4,r1(q.x),r1(q.y),Math.round(q.vx),Math.round(q.vy),q.T.id,r2(q.t),r2(q.tof)];
   return null;}
 function unpackShell(a){const T=tget(a[5])||SUPPORT;

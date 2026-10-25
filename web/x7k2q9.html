@@ -244,7 +244,7 @@ function edit(kind,id,name,label,ab,done){ED={kind,id,done};$('#edH').textConten
 $('#edNo').onclick=()=>{$('#ed').hidden=true;ED=null;};
 $('#edGo').onclick=async()=>{if(!ED)return;const name=$('#edName').value.trim(),label=$('#edLabel').value.trim(),ab=abGet('#ed');if(!name||!label)return say('#edMsg','Callsign and badge text are needed.','bad');
   try{if(ED.kind==='code')await admin('set',[ED.id],{cs:name,v:label,ab});else await admin('rebadge',[ED.id],{name,label,ab});const d=ED.done;$('#ed').hidden=true;ED=null;d&&d({name,label,ab});}catch(e){say('#edMsg',e.message,'bad');}};
-const gives=r=>r.k==='all'?'Every vehicle (session)':r.k==='rp'?(+r.v).toLocaleString()+' RP':r.k==='veh'?(VEH[r.v]||r.v):r.k==='badge'?'Badge: '+r.v+(r.cs?' for '+r.cs:''):r.k==='badgeref'?'Badge again (new device)':r.k;
+const gives=r=>r.k==='all'?'Every vehicle (session)':r.k==='rp'?(+r.v).toLocaleString()+' RP':r.k==='veh'?(VEH[r.v]||r.v):r.k==='badge'?'Badge: '+r.v+(r.cs?' for '+r.cs:'')+(r.n>0?' (their key)':''):r.k==='badgeref'?'Badge again (new device)':r.k;
 $('#kGo').onclick=async()=>{const k=$('#kKind').value,d={k,uses:Math.max(1,Math.min(10000,Math.round(+$('#kUses').value||1))),exp:fromLocal($('#kExp').value),note:$('#kNote').value.trim()};
   if(k==='rp'){d.v=Math.round(+$('#kRp').value||0);if(d.v<1||d.v>1e6)return say('#kMsg','RP must be between 1 and 1,000,000.','bad');}
   if(k==='veh'){d.v=$('#kVeh').value;if(!d.v)return say('#kMsg','Pick a vehicle.','bad');}
@@ -269,11 +269,11 @@ async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn
     btn('Copy',()=>navigator.clipboard.writeText(fmtCode(code)).then(()=>say('#cMsg','Copied '+fmtCode(code)+'.','ok'),()=>{}));
     if(st==='ready'||st==='off')btn(r.off?'Turn on':'Turn off',async()=>{try{await admin('set',[id],{off:!r.off});loadCodes();}catch(e){say('#cMsg',e.message,'bad');}});
     if(r.k==='badge'&&r.n<r.uses)btn('Edit',()=>edit('code',id,r.cs,r.v,r.ab,()=>loadCodes().then(()=>say('#cMsg','Saved.','ok'))));
-    btn('Delete',async()=>{if(!confirm('Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
+    btn('Delete',async()=>{if(!confirm(r.k==='badge'&&r.n>0?'Delete '+fmtCode(code)+'? It is '+(r.cs||'the holder')+'\'s key: entering it again brings their badge back on a new device. Without it you can still make a New device code in Badges.':'Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
     box.append(it);}}
 $('#cRefresh').onclick=loadCodes;
 $('#allBtn').onclick=async()=>{if(allOn&&!confirm('Switch every code off? Nobody can redeem anything until you switch them back on.'))return;try{await admin(allOn?'alloff':'allon');await loadCodes();loadStat();}catch(e){say('#cMsg',e.message,'bad');}};
-async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))).map(c=>c[0]);if(!ids.length)return say('#cMsg','No '+what+' codes.');
+async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))&&r.k!=='badge').map(c=>c[0]);if(!ids.length)return say('#cMsg','No '+what+' codes.');
   if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
 $('#cDelDone').onclick=()=>delWhere(s=>s==='done','used-up');
 $('#cDelExp').onclick=()=>delWhere(s=>s==='exp','expired');
