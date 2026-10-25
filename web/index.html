@@ -392,8 +392,8 @@ const NAT=Object.fromEntries(NATIONS.map(n=>[n.id,n]));
 const CLASSES=[{id:'light',name:'Light tanks',one:'Light tank'},{id:'medium',name:'Medium tanks',one:'Medium tank'},{id:'heavy',name:'Heavy tanks',one:'Heavy tank'},{id:'td',name:'Tank destroyers',one:'Tank destroyer'},{id:'spg',name:'Artillery',one:'Self-propelled gun'},{id:'aa',name:'Anti-air',one:'Anti-aircraft vehicle'}];
 const AIR_CLASSES=[{id:'fighter',name:'Fighters & attack',one:'Fighter'},{id:'bomber',name:'Bombers',one:'Bomber'}];
 const CLS=Object.fromEntries(CLASSES.concat(AIR_CLASSES).map(c=>[c.id,c]));
-const ROMAN=['','I','II','III','IV','V','★'];
-const COST=[0,400,1100,2400,4500,8000,0];
+const ROMAN=['','I','II','III','IV','V','VI'];
+const COST=[0,400,1100,2400,4500,8000,12000];
 /* fall: penetration lost per km; ric: angle (deg) where ricochets begin; spall: fragment multiplier; cone: spall cone half-angle; core: how far the penetrator travels inside */
 const AMMO={
   AP:{fall:.18,ric:62,spall:1,cone:22,core:1,col:'255,226,160',desc:'AP: solid steel shot. No filler, so it relies on spall.'},
@@ -2764,7 +2764,7 @@ function domTabsHTML(cur,pfx){const n=ROSTER.filter(T=>T.air&&owned(T.id)).lengt
 function treeHTML(nat,dom,listMode,node){const cls=dom==='air'?AIR_CLASSES:CLASSES,inDom=o=>o.nation===nat&&domOf(o)===dom;
   if(listMode){let h='';for(const c of cls){const items=ROSTER.filter(o=>inDom(o)&&o.cls===c.id).sort((a,b)=>a.tier-b.tier);if(items.length)h+='<div class="lh full">'+c.name+'</div>'+items.map(node).join('');}return h;}
   let h='<div></div>'+cls.map(c=>'<div class="lh">'+c.name+'</div>').join('');
-  for(let tier=1;tier<=5;tier++){h+='<div class="tl">'+ROMAN[tier]+'</div>';for(const c of cls){const T=ROSTER.find(o=>inDom(o)&&o.cls===c.id&&o.tier===tier&&!o.admin);h+=T?node(T):'<div class="gap" aria-hidden="true"></div>';}}
+  for(let tier=1;tier<=6;tier++){if(tier===6&&!ROSTER.some(o=>inDom(o)&&o.tier===6&&!o.admin))continue;h+='<div class="tl">'+ROMAN[tier]+'</div>';for(const c of cls){const T=ROSTER.find(o=>inDom(o)&&o.cls===c.id&&o.tier===tier&&!o.admin);h+=T?node(T):'<div class="gap" aria-hidden="true"></div>';}}
   const adm=ROSTER.filter(o=>inDom(o)&&o.admin);if(adm.length){h+='<div class="tl adm">ADMIN</div>';for(const c of cls){const T=adm.find(o=>o.cls===c.id);h+=T?node(T):'<div></div>';}}
   return h;}
 function cpList(){const out=[1];for(let w=5;w<=(save.checkpoint||0);w=w<10?10:w<20?20:w+10)out.push(w);return out;}
