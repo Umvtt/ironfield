@@ -5,50 +5,79 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://*.workers.dev https://*.pages.dev; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.workers.dev https://*.pages.dev; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Sign in</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Saira+Condensed:wght@500;600;700&family=Saira+Stencil+One&display=swap">
 <style>
-:root{--bg:#10130d;--panel:#1b2015;--panel2:#232a1b;--line:#3a4229;--text:#d8cfa2;--dim:#8e8a6b;--accent:#f2a23a;--ok:#8bd66e;--bad:#ee5d50}
+:root{--bg:#0b0e09;--glass:rgba(33,40,25,.42);--glass2:rgba(52,62,38,.38);--edge:rgba(216,207,162,.14);--edge2:rgba(216,207,162,.26);--text:#e4dbb0;--dim:#9a9677;--accent:#f2a23a;--ok:#8bd66e;--bad:#ee5d50;--line:rgba(216,207,162,.16);--panel2:rgba(52,62,38,.5);
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;--head:"Saira Condensed","Arial Narrow",system-ui,sans-serif;--sten:"Saira Stencil One",Impact,sans-serif}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
-main{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-h1{margin:0;color:var(--accent);font-size:24px;letter-spacing:.02em}
-h2{margin:0;font-size:18px;color:var(--text)}
+html,body{min-height:100%;height:100%}
+body{margin:0;color:var(--text);font:15px/1.5 var(--head);letter-spacing:.01em;background:var(--bg);overflow-x:hidden}
+.bg{position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(900px 600px at 12% 8%,rgba(242,162,58,.16),transparent 60%),radial-gradient(800px 700px at 92% 85%,rgba(139,214,110,.12),transparent 60%),radial-gradient(700px 500px at 70% 10%,rgba(90,110,60,.25),transparent 65%),
+  linear-gradient(rgba(216,207,162,.035) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,rgba(216,207,162,.035) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(160deg,#141a10,#0b0e09 55%,#10140c)}
+main{min-height:100vh;width:100%}
+h2{margin:0;font:600 19px var(--head);letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
 p{margin:0;color:var(--dim)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:10px}
-label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--dim)}
-label.chk{flex-direction:row;align-items:center;gap:8px;color:var(--text);font-size:15px}
-input,select,textarea{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:3px;padding:8px 10px;font:inherit;width:100%}
-input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
-textarea{resize:vertical;min-height:64px}
+.card{background:var(--glass);border:1px solid var(--edge);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;
+  backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 18px 40px rgba(0,0,0,.35)}
+#setup,#lock{max-width:440px;margin:12vh auto 0;width:calc(100% - 32px)}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--dim);letter-spacing:.05em;text-transform:uppercase}
+label.chk{flex-direction:row;align-items:center;gap:10px;color:var(--text);font-size:15px;text-transform:none;letter-spacing:0}
+input,select,textarea{background:rgba(8,10,6,.55);color:var(--text);border:1px solid var(--edge);border-radius:8px;padding:9px 11px;font:15px var(--mono);width:100%;outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{border-color:rgba(242,162,58,.7);box-shadow:0 0 0 3px rgba(242,162,58,.15)}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);flex:none}
+textarea{resize:vertical;min-height:70px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
-button{background:var(--accent);color:var(--bg);border:0;border-radius:3px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer}
-button:disabled{opacity:.5;cursor:default}
-button.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
-button.small{padding:5px 10px;font-size:13px}
-button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
-.tabs{display:flex;gap:6px;flex-wrap:wrap}
-.tabs button{background:transparent;color:var(--dim);border:1px solid var(--line)}
-.tabs button[aria-selected=true]{background:var(--panel2);color:var(--accent);border-color:var(--accent)}
-.code{font:700 24px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;color:var(--accent);overflow-wrap:anywhere}
-.msg{min-height:1.5em;color:var(--dim);overflow-wrap:anywhere}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+button{background:linear-gradient(180deg,#f6b252,#e48f22);color:#1a1307;border:0;border-radius:8px;padding:9px 16px;font:700 14px var(--head);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;box-shadow:0 4px 14px rgba(242,162,58,.25)}
+button:hover{filter:brightness(1.08)}button:disabled{opacity:.45;cursor:default;filter:none}
+button.ghost{background:rgba(216,207,162,.06);color:var(--text);border:1px solid var(--edge2);box-shadow:none}
+button.small{padding:5px 11px;font-size:12px}
+button.danger{background:rgba(238,93,80,.08);color:var(--bad);border:1px solid rgba(238,93,80,.6);box-shadow:none}
+.shell{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;padding:22px 14px;display:flex;flex-direction:column;gap:6px;background:rgba(14,18,10,.45);border-right:1px solid var(--edge);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.mark{font:28px var(--sten);color:var(--accent);letter-spacing:.04em;padding:0 10px 14px;text-shadow:0 0 18px rgba(242,162,58,.35)}
+.tabs button{background:transparent;color:var(--dim);border:1px solid transparent;box-shadow:none;text-align:left;padding:10px 12px;font-size:14px;border-radius:10px;display:flex;gap:10px;align-items:center}
+.tabs button i{font-style:normal;width:18px;text-align:center;opacity:.8}
+.tabs button:hover{background:rgba(216,207,162,.06);color:var(--text)}
+.tabs button[aria-selected=true]{background:rgba(242,162,58,.12);color:var(--accent);border-color:rgba(242,162,58,.4)}
+.content{padding:22px 26px 40px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.code{font:600 26px var(--mono);letter-spacing:.06em;color:var(--accent);overflow-wrap:anywhere}
+.msg{min-height:1.5em;color:var(--dim);overflow-wrap:anywhere;font-family:var(--mono);font-size:13px}
 .msg.bad{color:var(--bad)}.msg.ok{color:var(--ok)}
 .list{display:flex;flex-direction:column;gap:6px}
-.item{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
-.item .c{font:600 15px ui-monospace,Menlo,Consolas,monospace;color:var(--text)}
+.item{background:rgba(216,207,162,.045);border:1px solid var(--edge);border-radius:10px;padding:9px 12px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
+.item:hover{border-color:var(--edge2)}
+.item .c{font:600 14px var(--mono);color:var(--text)}
 .item .k{color:var(--accent);font-weight:600}
-.item .d{color:var(--dim);font-size:14px}
+.item .d{color:var(--dim);font-size:13px;font-family:var(--mono)}
 .item .sp{flex:1}
 .st-ready{color:var(--ok)}.st-done,.st-exp{color:var(--dim)}.st-off{color:var(--bad)}
-.abs{display:flex;flex-direction:column;gap:6px}.chip{font-size:12px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;color:var(--text)}
-.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:10px 12px}.switch b{color:var(--text)}.switch p{margin:2px 0 0}
-.netbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#3a1f1b;border:1px solid var(--bad);border-radius:3px;padding:10px 12px;color:var(--text)}
+.abs{display:flex;flex-direction:column;gap:6px}.chip{font:600 11px var(--mono);border:1px solid var(--edge2);border-radius:20px;padding:1px 9px;color:var(--text);background:rgba(216,207,162,.06)}
+.chip.gold{color:var(--accent);border-color:rgba(242,162,58,.5)}.chip.green{color:var(--ok);border-color:rgba(139,214,110,.5)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(216,207,162,.045);border:1px solid var(--edge);border-radius:10px;padding:12px 14px}.switch b{color:var(--text)}.switch p{margin:2px 0 0}
+.netbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(80,30,24,.55);border:1px solid var(--bad);border-radius:10px;padding:10px 12px;color:var(--text);backdrop-filter:blur(10px)}
 .meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .2s}
+#stat{display:flex;gap:10px;flex-wrap:wrap}#stat span{font:600 12px var(--mono);padding:5px 11px;border-radius:20px;background:var(--glass);border:1px solid var(--edge);backdrop-filter:blur(10px)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:rgba(216,207,162,.05);border:1px solid var(--edge);border-radius:12px;padding:12px 14px}.kpi b{display:block;font:30px var(--sten);color:var(--accent);line-height:1.1}.kpi span{font-size:12px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.bars{display:flex;align-items:flex-end;gap:4px;height:160px;padding-top:8px;border-bottom:1px solid var(--edge)}
+.bars div{flex:1;min-width:4px;max-width:46px;background:linear-gradient(180deg,rgba(242,162,58,.95),rgba(242,162,58,.35));border-radius:4px 4px 0 0;position:relative}
+.bars div:hover{background:linear-gradient(180deg,#ffd08a,rgba(242,162,58,.6))}
+.bars.g div{background:linear-gradient(180deg,rgba(139,214,110,.9),rgba(139,214,110,.3))}
+.axis{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--dim)}
+.hbar{display:grid;grid-template-columns:minmax(90px,180px) 1fr 50px;gap:10px;align-items:center;font-size:14px}.hbar i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--accent),rgba(242,162,58,.3))}.hbar span:last-child{font-family:var(--mono);color:var(--dim);text-align:right}
+.vehs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;max-height:46vh;overflow:auto;padding:4px}
+.vehs h3{grid-column:1/-1;margin:10px 0 2px;font:600 13px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);display:inline-block}
 [hidden]{display:none!important}
+@media (max-width:820px){.shell{grid-template-columns:1fr}.side{position:sticky;height:auto;flex-direction:row;overflow-x:auto;padding:10px;gap:4px;border-right:0;border-bottom:1px solid var(--edge);z-index:5}.mark{display:none}.tabs button{white-space:nowrap;padding:8px 10px;font-size:13px}.content{padding:14px 12px 30px}.card{padding:14px;border-radius:12px}}
 </style>
 </head>
 <body>
+<div class="bg"></div>
 <main>
 <section class="card" id="setup" hidden>
   <label>Address <input id="sUrl" autocomplete="off" spellcheck="false"></label>
@@ -64,16 +93,20 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
   <div class="row"><button id="lGo" type="button">Sign in</button><button class="ghost small" id="lReset" type="button">Reset</button></div>
   <div class="msg" id="lMsg"></div>
 </section>
-<div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
+<div id="app" class="shell" hidden>
+  <nav class="side tabs" role="tablist"><div class="mark">IF</div>
+    <button type="button" data-tab="live" aria-selected="true"><i>◉</i>News &amp; settings</button>
+    <button type="button" data-tab="players" aria-selected="false"><i>●</i>Players</button>
+    <button type="button" data-tab="accts" aria-selected="false"><i>☰</i>Accounts</button>
+    <button type="button" data-tab="stats" aria-selected="false"><i>▮</i>Stats</button>
+    <button type="button" data-tab="codes" aria-selected="false"><i>#</i>Codes</button>
+    <button type="button" data-tab="log" aria-selected="false"><i>≡</i>Redeem log</button>
+    <button type="button" data-tab="badges" aria-selected="false"><i>★</i>Badges</button>
+    <button type="button" data-tab="acct" aria-selected="false"><i>⚿</i>Security</button>
+  </nav>
+  <div class="content">
   <section class="card" id="ed" hidden><h2 id="edH">Edit</h2><div class="grid"><label>Callsign <input id="edName" maxlength="16"></label><label>Badge text <input id="edLabel" maxlength="16"></label></div><p>Abilities</p><div class="abs" data-ab><label class="chk"><input type="checkbox" value="nuke"> Nukes in co-op</label><label class="chk"><input type="checkbox" value="admin"> Every vehicle (admin), every session &middot; no RP from them in rooms</label><label class="chk"><input type="checkbox" value="kick"> Can't be kicked</label><label class="chk"><input type="checkbox" value="vote"> Starts the next wave alone</label></div><div class="row"><button id="edGo" type="button">Save</button><button class="ghost" id="edNo" type="button">Cancel</button></div><div class="msg" id="edMsg"></div></section>
   <div class="row" id="stat" style="gap:14px;color:var(--dim);font-size:14px"></div>
-  <div class="tabs" role="tablist">
-    <button type="button" data-tab="live" aria-selected="true">News &amp; settings</button>
-    <button type="button" data-tab="codes" aria-selected="false">Codes</button>
-    <button type="button" data-tab="log" aria-selected="false">Redeem log</button>
-    <button type="button" data-tab="badges" aria-selected="false">Badges</button>
-    <button type="button" data-tab="acct" aria-selected="false">Security</button>
-  </div>
   <section class="card" data-pane="live">
     <h2>News in the hangar</h2>
     <label class="chk"><input type="checkbox" id="nOn"> Show the news</label>
@@ -92,6 +125,36 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     </div>
     <div class="row"><button id="cfgSave" type="button">Save and go live</button><button class="ghost small" id="cfgLoad" type="button">Reload</button></div>
     <div class="msg" id="cfgMsg"></div>
+  </section>
+  <section class="card" data-pane="players" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Online now</h2><span class="msg" id="pCount"></span></div>
+    <div class="row"><input id="mAll" maxlength="300" placeholder="Message to everyone online" style="flex:1;min-width:200px"><button id="mAllGo" type="button">Send to all</button></div>
+    <div class="list" id="pList"></div>
+    <div class="msg" id="pMsg"></div>
+    <h2>Open rooms</h2>
+    <div class="list" id="rList"></div>
+    <h2>Bans</h2>
+    <div class="list" id="banList"></div>
+  </section>
+  <section class="card" data-pane="accts" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Accounts</h2><div class="row"><input id="aFind" placeholder="Search callsign" style="width:220px"><button class="ghost small" id="aRefresh" type="button">Refresh</button></div></div>
+    <div class="list" id="aList"></div>
+    <div class="msg" id="aLMsg"></div>
+  </section>
+  <section class="card" id="sv" hidden>
+    <div class="row" style="justify-content:space-between"><h2 id="svH">Save</h2><div class="row" id="svSlots"></div></div>
+    <div class="grid"><label>RP <input id="svRp" type="number" min="0" step="1"></label><label>Best wave <input id="svBest" type="number" min="0" step="1"></label></div>
+    <div class="row"><button class="ghost small" id="svAll" type="button">Tick all</button><button class="ghost small" id="svNone" type="button">Starters only</button></div>
+    <div class="vehs" id="svVeh"></div>
+    <div class="row"><button id="svGo" type="button">Save to their account</button><button class="ghost" id="svNo" type="button">Close</button></div>
+    <div class="msg" id="svMsg"></div>
+  </section>
+  <section class="card" data-pane="stats" hidden>
+    <div class="kpis" id="kpis"></div>
+    <h2>Players per day</h2><div class="bars" id="chU"></div><div class="axis" id="axU"></div>
+    <h2>Waves cleared per day</h2><div class="bars g" id="chW"></div><div class="axis" id="axW"></div>
+    <h2>Most played vehicles (30 days)</h2><div class="list" id="topV"></div>
+    <div class="msg" id="stMsg"></div>
   </section>
   <section class="card" data-pane="codes" hidden>
     <h2>Make a code</h2>
@@ -138,6 +201,7 @@ button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad
     <p>The panel locks itself after 10 minutes without use, or 2 minutes after you switch away from it.</p>
     <div class="row"><button class="ghost" id="lockNow" type="button">Lock now</button><button class="danger" id="wipe" type="button">Remove the key from this device</button></div>
   </section>
+  </div>
 </div>
 </main>
 <script>
@@ -213,7 +277,7 @@ $('#aGo').onclick=async()=>{const o=$('#aOld').value,n=$('#aNew').value;
   say('#aMsg','Changing…');try{const obj=await unseal(o);await seal(n,obj);const st=load();st.url=obj.url;keep(st);for(const s of['#aOld','#aNew','#aNew2'])$(s).value='';say('#aMsg','Password changed.','ok');}
   catch(e){say('#aMsg','The current password is wrong.','bad');}};
 function openTab(t){for(const b of document.querySelectorAll('.tabs button'))b.setAttribute('aria-selected',String(b.dataset.tab===t));
-  for(const p of document.querySelectorAll('[data-pane]'))p.hidden=p.dataset.pane!==t;({live:loadCfg,codes:loadCodes,log:loadLog,badges:loadBadges})[t]?.();}
+  for(const p of document.querySelectorAll('[data-pane]'))p.hidden=p.dataset.pane!==t;if(t!=='accts')$('#sv').hidden=true;({live:loadCfg,codes:loadCodes,log:loadLog,badges:loadBadges,players:loadPlayers,accts:loadAccts,stats:loadStats})[t]?.();}
 for(const b of document.querySelectorAll('.tabs button'))b.onclick=()=>openTab(b.dataset.tab);
 const toLocal=ms=>{if(!ms)return '';const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());};
 const fromLocal=v=>v?new Date(v).getTime()||0:0;
@@ -227,9 +291,9 @@ $('#cfgSave').onclick=async()=>{const cfg={news:{on:$('#nOn').checked,text:$('#n
   const cur=+$('#curB').textContent||0;if(cfg.minBuild&&cur&&cfg.minBuild>cur)return say('#cfgMsg','The oldest build allowed can\'t be newer than the newest build ('+cur+').','bad');
   if(cfg.maint.on&&!confirm('Turn on maintenance? Nobody will be able to host or join co-op until you turn it off.'))return;
   say('#cfgMsg','Saving…');try{const j=await admin('cfgset',[],cfg);say('#cfgMsg','Live now: sent to '+(j.live||0)+' open game'+(j.live===1?'':'s')+'. Everyone else gets it when they open the game.','ok');loadStat();}catch(e){say('#cfgMsg','Not saved: '+e.message,'bad');}};
-let VEH={};
+let VEH={},VLIST=[];
 fetch('index.html',{cache:'no-store'}).then(r=>r.text()).then(src=>{const re=/\b([VA])\('(usa|ger|ussr|uk|fra)','(\w+)',(\d),'(\w+)','((?:[^'\\]|\\.)*)',\{([^\n]*)/g;let m;const list=[];
-  while((m=re.exec(src)))if(!/\badmin:1/.test(m[7]))list.push({id:m[5],name:m[6].replace(/\\'/g,"'"),nat:m[2],cls:m[3],tier:+m[4]});
+  while((m=re.exec(src)))if(!/\badmin:1/.test(m[7]))list.push({id:m[5],name:m[6].replace(/\\'/g,"'"),nat:m[2],cls:m[3],tier:+m[4],start:/\bstart:1/.test(m[7])});VLIST=list;
   const N={usa:'USA',ger:'Germany',ussr:'USSR',uk:'Britain',fra:'France'},sel=$('#kVeh');sel.textContent='';
   for(const nat of Object.keys(N)){const g=document.createElement('optgroup');g.label=N[nat];for(const v of list.filter(v=>v.nat===nat).sort((a,b)=>a.tier-b.tier||a.name.localeCompare(b.name))){VEH[v.id]=v.name;const o=document.createElement('option');o.value=v.id;o.textContent='Tier '+v.tier+' · '+v.name+' ('+v.cls+')';g.append(o);}sel.append(g);}})
   .catch(()=>{$('#kVeh').innerHTML='<option value="">Could not load the vehicle list</option>';});
@@ -295,6 +359,55 @@ async function loadStat(){if(!KEY)return;try{const[o,c,l]=await Promise.all([adm
     add('● '+o.n+' game'+(o.n===1?'':'s')+' open now',true);add('Codes '+(allOn?'on':'off'),allOn);if(x.news.on)add('News on');if(x.rp.mul>1)add(x.rp.mul+'× RP');if(x.maint.on)add('Maintenance on',false);}catch(e){}}
 setInterval(()=>{if(KEY&&!document.hidden)loadStat();},30000);
 setInterval(()=>{if(!KEY||document.hidden||!$('#ed').hidden)return;const t=(document.querySelector('.tabs button[aria-selected=true]')||{}).dataset;({codes:loadCodes,log:loadLog,badges:loadBadges})[t&&t.tab]?.();},30000);
+/* players online, rooms, bans */
+const mk=(tag,cls,t)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(t!==undefined)e.textContent=t;return e;};
+const dur=ms=>{const m=Math.max(0,Math.round((Date.now()-ms)/60000));return m<60?m+' min':m<2880?Math.floor(m/60)+' h '+(m%60)+' min':Math.floor(m/1440)+' days';},ago=ms=>Date.now()-ms<60000?'just now':dur(ms)+' ago';
+const smallBtn=(t,f,cls)=>{const b=mk('button',(cls||'ghost')+' small',t);b.type='button';b.onclick=f;return b;};
+async function loadPlayers(){try{const[pl,rm,bn]=await Promise.all([admin('players'),admin('rooms'),admin('bans')]);
+    const P=pl.players.sort((a,b)=>(a.room||'~').localeCompare(b.room||'~')||a.t0-b.t0),box=$('#pList');box.textContent='';$('#pCount').textContent=P.length+' online';
+    for(const p of P){const it=mk('div','item');it.append(mk('span','dot'),mk('span','c',p.name||'(no name)'));if(p.badge)it.append(mk('span','chip gold','★ '+p.badge));if(p.an)it.append(mk('span','chip green','☁ '+p.an));
+      it.append(mk('span','d',p.mode==='host'?'hosting '+p.room:p.mode==='guest'?'in room '+p.room:'solo'),mk('span','d',p.st==='hangar'?'in hangar':'wave '+p.wave),mk('span','d',VEH[p.veh]||p.veh||''),mk('span','d','online '+dur(p.t0)),mk('span','d','build '+(p.ver||'dev')),mk('span','sp'));
+      it.append(smallBtn('Message',async()=>{const t=prompt('Message to '+(p.name||'this player')+':');if(!t)return;try{const r=await admin('msg',[],{to:[p.id],text:t});say('#pMsg',r.n?'Sent.':'They went offline.','ok');}catch(e){say('#pMsg',e.message,'bad');}}),
+        smallBtn('Kick',async()=>{const t=prompt('Kick '+(p.name||'this player')+' out of multiplayer? Reason (optional):','');if(t===null)return;try{await admin('kick',[p.id],{text:t});say('#pMsg','Kicked.','ok');loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}}),
+        smallBtn('Ban',async()=>{const t=prompt('Ban '+(p.name||'this player')+' from multiplayer and accounts? Reason:','');if(t===null)return;try{await admin('ban',[],{dev:p.dev,acct:p.acct,name:p.name,why:t});say('#pMsg','Banned.','ok');loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}},'danger'));box.append(it);}
+    if(!P.length)box.append(mk('p','','Nobody is online right now.'));
+    const rb=$('#rList');rb.textContent='';for(const r of rm.rooms){const it=mk('div','item');it.append(mk('span','c',r.code),mk('span','k',r.name),mk('span','d',r.n+'/'+r.max+' players'),mk('span','d',r.st?'wave '+r.wave:'in hangar'),mk('span','d',r.lock?'locked':'open'));rb.append(it);}if(!rm.rooms.length)rb.append(mk('p','','No listed rooms.'));
+    const bb=$('#banList');bb.textContent='';for(const x of bn.bans.slice().reverse()){const it=mk('div','item');it.append(mk('span','c',x.name||'(no name)'),mk('span','d',when(x.t)),mk('span','d',x.why||'no reason'),mk('span','sp'),smallBtn('Unban',async()=>{try{await admin('unban',[x.id]);loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}}));bb.append(it);}if(!bn.bans.length)bb.append(mk('p','','Nobody is banned.'));}
+  catch(e){say('#pMsg','Could not load: '+e.message,'bad');}}
+$('#mAllGo').onclick=async()=>{const t=$('#mAll').value.trim();if(!t)return;try{const r=await admin('msg',[],{text:t});$('#mAll').value='';say('#pMsg','Sent to '+r.n+' game'+(r.n===1?'':'s')+'.','ok');}catch(e){say('#pMsg',e.message,'bad');}};
+/* accounts and their saves */
+let ACCTS=[],SV=null;
+async function loadAccts(){say('#aLMsg','Loading…');try{ACCTS=(await admin('accts')).accts.sort((a,b)=>(b.last||0)-(a.last||0));renderAccts();say('#aLMsg',ACCTS.length?'':'No accounts yet.');}catch(e){say('#aLMsg','Could not load: '+e.message,'bad');}}
+function renderAccts(){const q=$('#aFind').value.trim().toLowerCase(),box=$('#aList');box.textContent='';
+  for(const a of ACCTS.filter(a=>!q||a.name.toLowerCase().includes(q))){const it=mk('div','item');it.append(mk('span','c',a.name));if(a.badge)it.append(mk('span','chip gold','★ badge'));
+    it.append(mk('span','k',Math.round(a.rp).toLocaleString()+' RP'),mk('span','d',a.veh+' vehicles'),mk('span','d','best wave '+a.best),mk('span','d','seen '+ago(a.last||a.made)),mk('span','d','since '+when(a.made)),mk('span','sp'),
+      smallBtn('Edit save',()=>openSave(a.id)),
+      smallBtn('New password',async()=>{const pw=prompt('New password for '+a.name+' (6+ characters). They are signed out everywhere.');if(!pw)return;if(pw.length<6)return say('#aLMsg','Too short.','bad');try{await admin('acctpw',[a.id],{pw});say('#aLMsg','Password changed for '+a.name+'.','ok');}catch(e){say('#aLMsg',e.message,'bad');}}),
+      smallBtn('Delete',async()=>{if(!confirm('Delete the account '+a.name+' and its cloud save? Their device keeps its local copy.'))return;try{await admin('acctdel',[a.id]);loadAccts();}catch(e){say('#aLMsg',e.message,'bad');}},'danger'));box.append(it);}}
+$('#aFind').oninput=renderAccts;$('#aRefresh').onclick=loadAccts;
+async function openSave(id){try{const a=(await admin('acctget',[id])).acct;const sv=a.save&&Array.isArray(a.save.slots)?a.save:{active:0,slots:[null,null,null]};SV={id,name:a.name,save:sv,slot:sv.active||0};$('#svH').textContent=a.name;renderSave();$('#sv').hidden=false;$('#sv').scrollIntoView({behavior:'smooth'});say('#svMsg','');}catch(e){say('#aLMsg',e.message,'bad');}}
+const STARTS=()=>VLIST.filter(v=>v.start).map(v=>v.id);
+function readSave(){if(!SV)return;const sl=SV.save.slots[SV.slot];if(!sl)return;sl.rp=Math.max(0,Math.round(+$('#svRp').value||0));sl.best=Math.max(0,Math.round(+$('#svBest').value||0));
+  const own=[...document.querySelectorAll('#svVeh input:checked')].map(i=>i.value);const keep=(sl.owned||[]).filter(id=>!VEH[id]);sl.owned=[...new Set(keep.concat(own,STARTS()))];sl.earned=[...new Set((sl.earned||[]).filter(id=>sl.owned.includes(id)).concat(own))];if(!sl.owned.includes(sl.sel))sl.sel=sl.owned[0]||'m4a1';}
+function renderSave(){const sb=$('#svSlots');sb.textContent='';for(let i=0;i<3;i++){const b=smallBtn('Slot '+(i+1)+(SV.save.slots[i]?'':' (empty)'),()=>{readSave();SV.slot=i;renderSave();},i===SV.slot?'':'ghost');sb.append(b);}
+  let sl=SV.save.slots[SV.slot];const box=$('#svVeh');box.textContent='';
+  if(!sl){box.append(mk('p','','Empty slot.'),smallBtn('Start a fresh save here',()=>{SV.save.slots[SV.slot]={rp:0,owned:STARTS(),earned:STARTS(),sel:'m4a1',best:0,nation:'usa',frBoom:false,checkpoint:0,startAt:1};renderSave();}));$('#svRp').value='';$('#svBest').value='';return;}
+  $('#svRp').value=Math.round(sl.rp||0);$('#svBest').value=sl.best||0;const N={usa:'USA',ger:'Germany',ussr:'USSR',uk:'Britain',fra:'France'};
+  for(const nat of Object.keys(N)){box.append(mk('h3','',N[nat]));for(const v of VLIST.filter(v=>v.nat===nat).sort((a,b)=>(a.cls==='fighter'||a.cls==='bomber')-(b.cls==='fighter'||b.cls==='bomber')||a.tier-b.tier)){const l=mk('label','chk'),c=document.createElement('input');c.type='checkbox';c.value=v.id;c.checked=(sl.owned||[]).includes(v.id);c.disabled=v.start;l.append(c,document.createTextNode('T'+v.tier+' '+v.name));box.append(l);}}}
+$('#svAll').onclick=()=>{for(const c of document.querySelectorAll('#svVeh input'))c.checked=true;};
+$('#svNone').onclick=()=>{for(const c of document.querySelectorAll('#svVeh input'))c.checked=c.disabled;};
+$('#svNo').onclick=()=>{$('#sv').hidden=true;SV=null;};
+$('#svGo').onclick=async()=>{if(!SV)return;readSave();say('#svMsg','Saving…');try{const r=await admin('acctset',[SV.id],{save:SV.save});say('#svMsg','Saved'+(r.live?': their open game reloads it now.':'. They get it next time they open the game.'),'ok');loadAccts();}catch(e){say('#svMsg',e.message,'bad');}};
+/* daily stats */
+async function loadStats(){say('#stMsg','Loading…');try{const j=await admin('stats'),D=j.days.slice(0,30).reverse(),today=j.days[0]||{};
+    const k=$('#kpis');k.textContent='';for(const[n,l]of[[j.online,'online now'],[today.u||0,'players today'],[j.accts,'accounts'],[today.w||0,'waves cleared today'],[today.r||0,'codes today'],[today.pk||0,'peak today'],[today.rooms||0,'rooms today'],[Math.max(0,...j.days.map(d=>d.best||0)),'best wave']]){const t=mk('div','kpi');t.append(mk('b','',Number(n).toLocaleString()),mk('span','',l));k.append(t);}
+    const bars=(el,ax,key)=>{const box=$(el);box.textContent='';const mx=Math.max(1,...D.map(d=>d[key]||0));for(const d of D){const b=mk('div');b.style.height=Math.max(2,Math.round((d[key]||0)/mx*100))+'%';b.title=d.d+': '+(d[key]||0);box.append(b);}
+      const a=$(ax);a.textContent='';if(D.length){a.append(mk('span','',D[0].d.slice(5)),mk('span','','max '+mx),mk('span','',D[D.length-1].d.slice(5)));}};
+    bars('#chU','#axU','u');bars('#chW','#axW','w');
+    const V={};for(const d of D)for(const[id,n]of Object.entries(d.vh||{}))V[id]=(V[id]||0)+n;const top=Object.entries(V).sort((a,b)=>b[1]-a[1]).slice(0,12),mx=Math.max(1,...top.map(x=>x[1])),tv=$('#topV');tv.textContent='';
+    for(const[id,n]of top){const r=mk('div','hbar'),bar=mk('div'),i=mk('i');i.style.width=Math.round(n/mx*100)+'%';bar.append(i);r.append(mk('span','',VEH[id]||id),bar,mk('span','',String(n)));tv.append(r);}
+    say('#stMsg',D.length?'':'No data yet: stats start counting from today.');}catch(e){say('#stMsg','Could not load: '+e.message,'bad');}}
+setInterval(()=>{if(!KEY||document.hidden)return;const t=(document.querySelector('.tabs button[aria-selected=true]')||{}).dataset;if(t&&t.tab==='players')loadPlayers();},6000);
 show(load().ct?'#lock':'#setup');
 </script>
 </body>
