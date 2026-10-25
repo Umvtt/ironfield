@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.workers.dev https://*.pages.dev; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.workers.dev https://*.pages.dev https://*.deno.net wss://*.deno.net; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Sign in</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Saira+Condensed:wght@500;600;700&family=Saira+Stencil+One&display=swap">
 <style>
@@ -211,7 +211,7 @@ if(window.top!==window.self){document.documentElement.textContent='';throw new E
 const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',enc=new TextEncoder(),dec=new TextDecoder(),$=s=>document.querySelector(s);
 const STORE='ironfield-admin',ROUNDS=600000,IDLE=10*60e3,AWAY=2*60e3;
 let KEY=null,URL0='',ALT=[],pIdx=0;
-fetch('codes.json',{cache:'no-store'}).then(r=>r.json()).then(c=>{ALT=[c.api].concat(c.alt||[]).filter(u=>typeof u==='string'&&/^https:\/\/[a-z0-9.-]+\.(workers|pages)\.dev\/?$/i.test(u)).map(u=>u.replace(/\/$/,''));}).catch(()=>{});
+fetch('codes.json',{cache:'no-store'}).then(r=>r.json()).then(c=>{ALT=[c.api].concat(c.alt||[]).filter(u=>typeof u==='string'&&/^https:\/\/[a-z0-9.-]+\.(workers\.dev|pages\.dev|deno\.net)\/?$/i.test(u)).map(u=>u.replace(/\/$/,''));}).catch(()=>{});
 const urls=u=>{const a=[(u||URL0).replace(/\/$/,'')];for(const x of ALT)if(!a.includes(x))a.push(x);return a;};
 const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const load=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}');}catch(e){return{};}};
@@ -253,7 +253,7 @@ function lockTimer(){const st=load(),left=Math.max(0,(st.until||0)-Date.now());$
   if(left>0){say('#lMsg','Try again later.','bad');setTimeout(lockTimer,1000);}else if($('#lMsg').textContent.startsWith('Try again'))say('#lMsg','');}
 meter('#sPw','#sMeter');meter('#aNew','#aMeter');
 $('#sGo').onclick=async()=>{const url=$('#sUrl').value.trim(),secret=$('#sKey').value,pw=$('#sPw').value;
-  if(!/^https:\/\/[a-z0-9.-]+\.(workers|pages)\.dev\/?$/i.test(url))return say('#sMsg','Invalid address.','bad');
+  if(!/^https:\/\/[a-z0-9.-]+\.(workers\.dev|pages\.dev|deno\.net)\/?$/i.test(url))return say('#sMsg','Invalid address.','bad');
   if(secret.length<16)return say('#sMsg','Invalid key.','bad');
   if(!strongEnough(pw))return say('#sMsg','Password too weak: 12+ characters with 3 of lowercase, uppercase, numbers, symbols (or 20+ characters).','bad');
   if(pw!==$('#sPw2').value)return say('#sMsg','Passwords differ.','bad');

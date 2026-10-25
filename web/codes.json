@@ -1,4 +1,7 @@
 {
- "api": "https://ironfield-codes.umvtt.workers.dev",
- "alt": ["https://ironfield-api.pages.dev"]
+  "api": "https://ironfield-codes.umvtt.workers.dev",
+  "alt": [
+    "https://ironfield-api.umvtt.deno.net",
+    "https://ironfield-api.pages.dev"
+  ]
 }
