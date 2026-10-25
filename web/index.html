@@ -3409,7 +3409,10 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
-let livePoll=Date.now();liveCfg().then(()=>{liveConnect();if(store.acct){acctName();acctLoad();}});renderAcct();roomsPoll();
+/* a backup address is only for networks that need it: each start, check the main one again and go back to it if it works */
+async function apiHome(){const L=await codeAPIs();if(!apiIdx||!L.length)return;try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),5000),r=await fetch(L[0]+'/config',{cache:'no-store',signal:ac.signal});clearTimeout(to);
+  if(r.ok){apiWorked(0);try{liveWs&&liveWs.close();}catch(e){}}}catch(e){}}
+let livePoll=Date.now();apiHome().finally(()=>liveCfg()).then(()=>{liveConnect();if(store.acct){acctName();acctLoad();}});renderAcct();roomsPoll();
 setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>45000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-livePoll>5000){livePoll=Date.now();liveCfg();}});checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
