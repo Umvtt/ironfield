@@ -1282,7 +1282,7 @@ function truckPos(k){const rd=gFeat.roads[k.ri];let d=k.u;for(let i=1;i<rd.lengt
 const roadLen=rd=>{let L=0;for(let i=1;i<rd.length;i++)L+=Math.hypot(rd[i][0]-rd[i-1][0],rd[i][1]-rd[i-1][1]);return L;};
 function trucksReset(){trucks=[];if(!gFeat||net.mode==='guest')return;const n=3+Math.round(WW*WH/6e6/3);for(let i=0;i<n;i++){const ri=Math.floor(Math.random()*gFeat.roads.length),L=roadLen(gFeat.roads[ri]);
   trucks.push({ri,u:Math.random()*L,L,dir:Math.random()<.5?1:-1,sp:rand(55,80),fuel:Math.random()<.35,dead:false,x:0,y:0,a:0});}}
-function trucksUpd(dt){if(net.mode==='guest')return;for(const k of trucks){if(k.dead)continue;if(k.cv){convoyUpd(k,dt);continue;}let nu=k.u+k.dir*k.sp*dt;if(nu<0||nu>k.L){k.dir*=-1;nu=clamp(nu,0,k.L);}
+function trucksUpd(dt){if(net.mode==='guest')return;for(const k of trucks){if(k.dead||k.ri===undefined)continue;if(k.cv){convoyUpd(k,dt);continue;}let nu=k.u+k.dir*k.sp*dt;if(nu<0||nu>k.L){k.dir*=-1;nu=clamp(nu,0,k.L);}
     const old=k.u;k.u=nu;let p=truckPos(k);if(inWater(p.x,p.y,4)||inObs(p.x,p.y,4)){k.u=old;k.dir*=-1;p=truckPos(k);}k.x=p.x;k.y=p.y;k.a=p.a;
     for(const t of tanks){if(!t.alive||t.air)continue;if(Math.hypot(t.x-k.x,t.y-k.y)<t.T.R+14){truckDie(k,t);break;}}}}
 function truckDie(k,by){if(k.dead)return;k.dead=true;fx({k:'boom',x:r1(k.x),y:r1(k.y),f:k.fuel?6000:1500});if(k.fuel&&net.mode!=='guest')fuelQ.push({x:k.x,y:k.y,by,at:time+.1,f:12000});}
