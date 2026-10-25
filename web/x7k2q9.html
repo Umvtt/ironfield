@@ -74,6 +74,26 @@ button.danger{background:rgba(238,93,80,.08);color:var(--bad);border:1px solid r
 .vehs h4{grid-column:1/-1;margin:6px 0 0;font:600 12px var(--head);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);display:inline-block}
 [hidden]{display:none!important}
+.dlg{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,7,4,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeIn .15s ease}
+.dlg .card{width:100%;max-width:520px;max-height:88vh;overflow:auto;animation:popIn .18s ease}.dlg.wide .card{max-width:860px}
+.dlg h2{display:flex;justify-content:space-between;align-items:center;gap:10px}
+@keyframes fadeIn{from{opacity:0}}@keyframes popIn{from{transform:translateY(10px) scale(.98);opacity:0}}
+.toasts{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:rgba(24,30,18,.92);border:1px solid var(--edge2);border-left:4px solid var(--accent);border-radius:10px;padding:10px 14px;font:14px var(--head);box-shadow:0 10px 30px rgba(0,0,0,.4);animation:popIn .2s ease}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--bad)}
+.dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chips .chip{font-size:12px;padding:4px 10px}
+.chip.on{color:var(--ok);border-color:rgba(139,214,110,.5)}.chip.off{color:var(--bad);border-color:rgba(238,93,80,.5)}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.evgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.ev{background:rgba(216,207,162,.05);border:1px solid var(--edge);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.ev b{font:20px var(--sten);color:var(--accent)}.ev p{font-size:14px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th{text-align:left;font:600 12px var(--head);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 8px;border-bottom:1px solid var(--edge)}
+.tbl td{padding:7px 8px;border-bottom:1px solid rgba(216,207,162,.07);font-family:var(--mono);font-size:13px}.tbl tr:hover td{background:rgba(216,207,162,.04)}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:14px}.kv span:nth-child(odd){color:var(--dim);text-transform:uppercase;font-size:12px;letter-spacing:.06em;padding-top:2px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pulse 1.6s infinite}@keyframes pulse{50%{opacity:.35}}
+.menu{position:relative;display:inline-block}.menu .pop{position:absolute;right:0;top:calc(100% + 4px);z-index:20;background:rgba(20,25,15,.96);border:1px solid var(--edge2);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px;min-width:170px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.menu .pop button{text-align:left;background:transparent;color:var(--text);border:0;box-shadow:none;padding:7px 10px;text-transform:none;font:500 14px var(--head);letter-spacing:0}.menu .pop button:hover{background:rgba(242,162,58,.12);color:var(--accent)}
 @media (max-width:820px){.shell{grid-template-columns:1fr}.side{position:sticky;height:auto;flex-direction:row;overflow-x:auto;padding:10px;gap:4px;border-right:0;border-bottom:1px solid var(--edge);z-index:5}.mark{display:none}.tabs button{white-space:nowrap;padding:8px 10px;font-size:13px}.content{padding:14px 12px 30px}.card{padding:14px;border-radius:12px}}
 </style>
 </head>
@@ -96,19 +116,57 @@ button.danger{background:rgba(238,93,80,.08);color:var(--bad);border:1px solid r
 </section>
 <div id="app" class="shell" hidden>
   <nav class="side tabs" role="tablist"><div class="mark">IF</div>
-    <button type="button" data-tab="live" aria-selected="true"><i>◉</i>News &amp; settings</button>
+    <button type="button" data-tab="dash" aria-selected="true"><i>⌂</i>Dashboard</button>
     <button type="button" data-tab="players" aria-selected="false"><i>●</i>Players</button>
+    <button type="button" data-tab="events" aria-selected="false"><i>✦</i>Events &amp; fun</button>
+    <button type="button" data-tab="live" aria-selected="false"><i>◉</i>News &amp; settings</button>
     <button type="button" data-tab="accts" aria-selected="false"><i>☰</i>Accounts</button>
+    <button type="button" data-tab="lb" aria-selected="false"><i>♛</i>Leaderboard</button>
     <button type="button" data-tab="stats" aria-selected="false"><i>▮</i>Stats</button>
     <button type="button" data-tab="codes" aria-selected="false"><i>#</i>Codes</button>
     <button type="button" data-tab="log" aria-selected="false"><i>≡</i>Redeem log</button>
     <button type="button" data-tab="badges" aria-selected="false"><i>★</i>Badges</button>
+    <button type="button" data-tab="alog" aria-selected="false"><i>⟲</i>Activity</button>
     <button type="button" data-tab="acct" aria-selected="false"><i>⚿</i>Security</button>
   </nav>
   <div class="content">
   <section class="card" id="ed" hidden><h2 id="edH">Edit</h2><div class="grid"><label>Callsign <input id="edName" maxlength="16"></label><label>Badge text <input id="edLabel" maxlength="16"></label></div><p>Abilities</p><div class="abs" data-ab><label class="chk"><input type="checkbox" value="nuke"> Nukes in co-op</label><label class="chk"><input type="checkbox" value="admin"> Every vehicle (admin), every session &middot; no RP from them in rooms</label><label class="chk"><input type="checkbox" value="kick"> Can't be kicked</label><label class="chk"><input type="checkbox" value="vote"> Starts the next wave alone</label></div><div class="row"><button id="edGo" type="button">Save</button><button class="ghost" id="edNo" type="button">Cancel</button></div><div class="msg" id="edMsg"></div></section>
   <div class="row" id="stat" style="gap:14px;color:var(--dim);font-size:14px"></div>
-  <section class="card" data-pane="live">
+  <div data-pane="dash">
+    <div class="kpis" id="dKpi"></div>
+    <div class="dash" style="margin-top:16px">
+      <section class="card"><h2>Status</h2><div class="chips" id="dChips"></div><div class="btns" id="dQuick"></div>
+        <div class="row"><input id="dMsg" maxlength="300" placeholder="Message everyone online" style="flex:1;min-width:160px"><button id="dMsgGo" type="button">Send</button></div></section>
+      <section class="card"><h2>Rooms <span class="msg" id="dRoomN"></span></h2><div class="list" id="dRooms"></div></section>
+      <section class="card"><h2>Recent activity</h2><div class="list" id="dLog"></div></section>
+      <section class="card"><h2>Game versions online</h2><div class="list" id="dVers"></div></section>
+    </div>
+  </div>
+  <section class="card" data-pane="events" hidden>
+    <h2>Global events</h2><p>Every running game gets these right away. Battles in progress get them now; games in the hangar or between waves at the next wave.</p>
+    <label>Message with the event (optional) <input id="evText" maxlength="120" placeholder="e.g. Good luck, commanders!"></label>
+    <div class="evgrid">
+      <div class="ev"><b>Boss tank</b><p>A three-times-tougher heavy tank joins the wave. Everyone gets a big RP bonus when it dies.</p><button type="button" data-ev="boss">Send the boss</button></div>
+      <div class="ev"><b>Air raid</b><p>A squadron of enemy bombers attacks every battle. AI fighters help squads without air cover.</p><button type="button" data-ev="raid">Start an air raid</button></div>
+      <div class="ev"><b>Night</b><p>Darkness: enemies only spot you up close, firing gives you away.</p><button type="button" data-ev="night">Make it night</button></div>
+      <div class="ev"><b>Storm</b><p>Heavy rain: enemies spot you later.</p><button type="button" data-ev="storm">Bring the storm</button></div>
+      <div class="ev"><b>RP event</b><p id="evRpNow">Multiplies all RP for a while, with a countdown banner.</p><div class="row"><select id="evMul" style="width:auto"><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option></select><select id="evMins" style="width:auto"><option value="30">30 min</option><option value="60" selected>1 hour</option><option value="180">3 hours</option><option value="1440">1 day</option><option value="4320">3 days</option></select></div><button type="button" data-ev="rp">Start RP event</button></div>
+    </div>
+    <h2>Fun for everyone</h2>
+    <div class="btns"><button class="ghost" type="button" data-fun="confetti">Confetti on every screen</button><button class="ghost" type="button" data-fun="shake">Shake every screen</button><button class="ghost" type="button" data-fun="honk">Honk at everyone</button></div>
+    <div class="msg" id="evMsg"></div>
+  </section>
+  <section class="card" data-pane="lb" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Leaderboard</h2><button class="ghost small" id="lbRefresh" type="button">Refresh</button></div>
+    <p>Shown in the game's hangar (top 10, signed-in players). Hide anyone who shouldn't be there.</p>
+    <div class="dash" id="lbCols"></div><div class="msg" id="lbMsg"></div>
+  </section>
+  <section class="card" data-pane="alog" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Activity</h2><button class="ghost small" id="alRefresh" type="button">Refresh</button></div>
+    <p>Every change made in this panel, newest first.</p>
+    <div class="list" id="alList"></div><div class="msg" id="alMsg"></div>
+  </section>
+  <section class="card" data-pane="live" hidden>
     <h2>News in the hangar</h2>
     <label class="chk"><input type="checkbox" id="nOn"> Show the news</label>
     <label>Text (up to 300 characters) <textarea id="nText" maxlength="300"></textarea></label>
@@ -136,6 +194,9 @@ button.danger{background:rgba(238,93,80,.08);color:var(--bad);border:1px solid r
     <div class="list" id="rList"></div>
     <h2>Bans</h2>
     <div class="list" id="banList"></div>
+    <h2>Player history</h2>
+    <div class="row"><input id="phQ" maxlength="16" placeholder="Search any callsign ever used" style="flex:1;min-width:180px"><button class="ghost" id="phGo" type="button">Search</button></div>
+    <div class="list" id="phList"></div>
   </section>
   <section class="card" data-pane="accts" hidden>
     <div class="row" style="justify-content:space-between"><h2>Accounts</h2><div class="row"><input id="aFind" placeholder="Search callsign" style="width:220px"><button class="ghost small" id="aRefresh" type="button">Refresh</button></div></div>
@@ -205,6 +266,7 @@ button.danger{background:rgba(238,93,80,.08);color:var(--bad);border:1px solid r
   </div>
 </div>
 </main>
+<div class="toasts" id="toasts"></div>
 <script>
 'use strict';
 if(window.top!==window.self){document.documentElement.textContent='';throw new Error('framed');}
@@ -216,6 +278,19 @@ const urls=u=>{const a=[(u||URL0).replace(/\/$/,'')];for(const x of ALT)if(!a.in
 const b64=u=>btoa(String.fromCharCode(...u)),unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const load=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}');}catch(e){return{};}};
 const keep=o=>localStorage.setItem(STORE,JSON.stringify(o));
+/* glass dialogs and toasts instead of the browser's prompt/confirm */
+function ask(o){return new Promise(res=>{const d=document.createElement('div');d.className='dlg';const c=document.createElement('div');c.className='card';d.append(c);
+  const h=document.createElement('h2');h.textContent=o.title||'';c.append(h);if(o.text){const p=document.createElement('p');p.textContent=o.text;c.append(p);}
+  const F={};for(const f of o.fields||[]){const l=document.createElement('label');l.textContent=f.label;let i;if(f.type==='select'){i=document.createElement('select');for(const[v,t]of f.options){const op=document.createElement('option');op.value=v;op.textContent=t;i.append(op);}}else if(f.type==='area'){i=document.createElement('textarea');}else{i=document.createElement('input');i.type=f.type||'text';}
+    if(f.value!==undefined)i.value=f.value;if(f.max)i.maxLength=f.max;if(f.ph)i.placeholder=f.ph;l.append(i);c.append(l);F[f.id]=i;}
+  const r=document.createElement('div');r.className='row';const ok=document.createElement('button');ok.type='button';ok.textContent=o.ok||'OK';if(o.danger)ok.className='danger';const no=document.createElement('button');no.type='button';no.className='ghost';no.textContent=o.cancel||'Cancel';r.append(ok,no);c.append(r);
+  const end=v=>{d.remove();removeEventListener('keydown',kd);res(v);};const kd=e=>{if(e.key==='Escape')end(null);if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA')ok.click();};addEventListener('keydown',kd);
+  ok.onclick=()=>{const v={};for(const k in F)v[k]=F[k].value;end(o.fields&&o.fields.length?v:true);};no.onclick=()=>end(null);d.onclick=e=>{if(e.target===d)end(null);};
+  document.body.append(d);const first=Object.values(F)[0];(first||ok).focus();});}
+const sure=(text,ok,danger)=>ask({title:'Are you sure?',text,ok:ok||'Yes',danger:danger!==false});
+function note(t,kind){const e=document.createElement('div');e.className='toast'+(kind?' '+kind:'');e.textContent=t;$('#toasts').append(e);setTimeout(()=>{e.style.transition='opacity .4s';e.style.opacity='0';setTimeout(()=>e.remove(),400);},3800);}
+function sheet(title,wide){const d=document.createElement('div');d.className='dlg'+(wide?' wide':'');const c=document.createElement('div');c.className='card';const h=document.createElement('h2');const t=document.createElement('span');t.textContent=title;const x=document.createElement('button');x.type='button';x.className='ghost small';x.textContent='Close';h.append(t,x);c.append(h);d.append(c);
+  const close=()=>{d.remove();d.onclose&&d.onclose();};x.onclick=close;d.onclick=e=>{if(e.target===d)close();};document.body.append(d);return{d,c,close,title:t};}
 const say=(sel,t,cls)=>{const e=$(sel);e.textContent=t;e.className='msg'+(cls?' '+cls:'');};
 const COMMON=['password','passw0rd','123456','qwerty','letmein','iloveyou','admin','welcome','ironfield','monkey','dragon','football','sifre','şifre','galatasaray','fenerbahce','besiktas','trabzonspor'];
 function strength(pw){if(!pw)return 0;const cls=[/[a-z]/,/[A-Z]/,/[0-9]/,/[^A-Za-z0-9]/].filter(r=>r.test(pw)).length,lo=pw.toLowerCase();
@@ -259,15 +334,15 @@ $('#sGo').onclick=async()=>{const url=$('#sUrl').value.trim(),secret=$('#sKey').
   if(pw!==$('#sPw2').value)return say('#sMsg','Passwords differ.','bad');
   say('#sMsg','…');$('#sGo').disabled=true;
   try{const k=await hmacKey(secret);await admin('cfgget',[],undefined,k,url);await seal(pw,{url,secret});const st=load();st.url=url;keep(st);
-    $('#sKey').value='';$('#sPw').value='';$('#sPw2').value='';KEY=k;URL0=url;say('#sMsg','');show('#app');openTab('live');loadStat();}
+    $('#sKey').value='';$('#sPw').value='';$('#sPw2').value='';KEY=k;URL0=url;say('#sMsg','');show('#app');openTab('dash');loadStat();}
   catch(e){say('#sMsg','Invalid key.','bad');}finally{$('#sGo').disabled=false;}};
 $('#lGo').onclick=async()=>{const st=load();if((st.until||0)>Date.now())return lockTimer();const pw=$('#lPw').value;if(!pw)return;$('#lGo').disabled=true;say('#lMsg','…');
-  try{const o=await unseal(pw);KEY=await hmacKey(o.secret);URL0=o.url;$('#lPw').value='';const s2=load();s2.fails=0;s2.until=0;keep(s2);say('#lMsg','');show('#app');openTab('live');poke();admin('list').then(j=>{allOn=j.all;loadStat();}).catch(()=>{});}
+  try{const o=await unseal(pw);KEY=await hmacKey(o.secret);URL0=o.url;$('#lPw').value='';const s2=load();s2.fails=0;s2.until=0;keep(s2);say('#lMsg','');show('#app');openTab('dash');poke();admin('list').then(j=>{allOn=j.all;loadStat();}).catch(()=>{});}
   catch(e){const s2=load();s2.fails=(s2.fails||0)+1;if(s2.fails>=5)s2.until=Date.now()+Math.min(3600e3,30e3*2**(s2.fails-5));keep(s2);$('#lPw').value='';say('#lMsg','Incorrect.','bad');lockTimer();}
   finally{if(!((load().until||0)>Date.now()))$('#lGo').disabled=false;}};
 $('#lPw').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lGo').click();});
-$('#lReset').onclick=()=>{if(confirm('Reset this device?')){localStorage.removeItem(STORE);show('#setup');}};
-$('#wipe').onclick=()=>{if(confirm('Remove the key from this device and lock? You will need the secret key to set it up again.')){localStorage.removeItem(STORE);KEY=null;URL0='';show('#setup');}};
+$('#lReset').onclick=async()=>{if(await sure('Reset this device? The saved key is removed.','Reset')){localStorage.removeItem(STORE);show('#setup');}};
+$('#wipe').onclick=async()=>{if(await sure('Remove the key from this device and lock? You will need the secret key to set it up again.','Remove')){localStorage.removeItem(STORE);KEY=null;URL0='';show('#setup');}};
 $('#lockNow').onclick=lock;
 let lastUse=Date.now(),hiddenAt=0;const poke=()=>{lastUse=Date.now();};
 for(const ev of['pointerdown','keydown','input','wheel','touchstart'])addEventListener(ev,poke,{passive:true});
@@ -278,7 +353,7 @@ $('#aGo').onclick=async()=>{const o=$('#aOld').value,n=$('#aNew').value;
   say('#aMsg','Changing…');try{const obj=await unseal(o);await seal(n,obj);const st=load();st.url=obj.url;keep(st);for(const s of['#aOld','#aNew','#aNew2'])$(s).value='';say('#aMsg','Password changed.','ok');}
   catch(e){say('#aMsg','The current password is wrong.','bad');}};
 function openTab(t){for(const b of document.querySelectorAll('.tabs button'))b.setAttribute('aria-selected',String(b.dataset.tab===t));
-  for(const p of document.querySelectorAll('[data-pane]'))p.hidden=p.dataset.pane!==t;if(t!=='accts')$('#sv').hidden=true;({live:loadCfg,codes:loadCodes,log:loadLog,badges:loadBadges,players:loadPlayers,accts:loadAccts,stats:loadStats})[t]?.();}
+  for(const p of document.querySelectorAll('[data-pane]'))p.hidden=p.dataset.pane!==t;if(t!=='accts')$('#sv').hidden=true;({live:loadCfg,codes:loadCodes,log:loadLog,badges:loadBadges,players:loadPlayers,accts:loadAccts,stats:loadStats,dash:loadDash,lb:loadLb,alog:loadAlog})[t]?.();}
 for(const b of document.querySelectorAll('.tabs button'))b.onclick=()=>openTab(b.dataset.tab);
 const toLocal=ms=>{if(!ms)return '';const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());};
 const fromLocal=v=>v?new Date(v).getTime()||0:0;
@@ -290,7 +365,7 @@ $('#cfgLoad').onclick=loadCfg;
 $('#cfgSave').onclick=async()=>{const cfg={news:{on:$('#nOn').checked,text:$('#nText').value.trim(),id:String(Date.now())},rp:{mul:+$('#rMul').value,until:fromLocal($('#rUntil').value)},
     maint:{on:$('#mOn').checked,text:$('#mText').value.trim()},minBuild:Math.max(0,Math.round(+$('#minB').value||0))};
   const cur=+$('#curB').textContent||0;if(cfg.minBuild&&cur&&cfg.minBuild>cur)return say('#cfgMsg','The oldest build allowed can\'t be newer than the newest build ('+cur+').','bad');
-  if(cfg.maint.on&&!confirm('Turn on maintenance? Nobody will be able to host or join co-op until you turn it off.'))return;
+  if(cfg.maint.on&&!(await sure('Turn on maintenance? Nobody will be able to host or join co-op until you turn it off.','Turn on')))return;
   say('#cfgMsg','Saving…');try{const j=await admin('cfgset',[],cfg);say('#cfgMsg','Live now: sent to '+(j.live||0)+' open game'+(j.live===1?'':'s')+'. Everyone else gets it when they open the game.','ok');loadStat();}catch(e){say('#cfgMsg','Not saved: '+e.message,'bad');}};
 let VEH={},VLIST=[];
 fetch('index.html',{cache:'no-store'}).then(r=>r.text()).then(src=>{const re=/\b([VA])\('(usa|ger|ussr|uk|fra)','(\w+)',(\d),'(\w+)','((?:[^'\\]|\\.)*)',\{([^\n]*)/g;let m;const list=[];
@@ -334,12 +409,12 @@ async function renderCodes(){const box=$('#cList');box.textContent='';$('#allBtn
     btn('Copy',()=>navigator.clipboard.writeText(fmtCode(code)).then(()=>say('#cMsg','Copied '+fmtCode(code)+'.','ok'),()=>{}));
     if(st==='ready'||st==='off')btn(r.off?'Turn on':'Turn off',async()=>{try{await admin('set',[id],{off:!r.off});loadCodes();}catch(e){say('#cMsg',e.message,'bad');}});
     if(r.k==='badge'&&r.n<r.uses)btn('Edit',()=>edit('code',id,r.cs,r.v,r.ab,()=>loadCodes().then(()=>say('#cMsg','Saved.','ok'))));
-    btn('Delete',async()=>{if(!confirm(r.k==='badge'&&r.n>0?'Delete '+fmtCode(code)+'? It is '+(r.cs||'the holder')+'\'s key: entering it again brings their badge back on a new device. Without it you can still make a New device code in Badges.':'Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
+    btn('Delete',async()=>{if(!await sure(r.k==='badge'&&r.n>0?'Delete '+fmtCode(code)+'? It is '+(r.cs||'the holder')+'\'s key: entering it again brings their badge back on a new device. Without it you can still make a New device code in Badges.':'Delete '+fmtCode(code)+'? It stops working for good.'))return;try{await admin('del',[id]);loadCodes();}catch(e){say('#cMsg',e.message,'bad');}},'danger');
     box.append(it);}}
 $('#cRefresh').onclick=loadCodes;
-$('#allBtn').onclick=async()=>{if(allOn&&!confirm('Switch every code off? Nobody can redeem anything until you switch them back on.'))return;try{await admin(allOn?'alloff':'allon');await loadCodes();loadStat();}catch(e){say('#cMsg',e.message,'bad');}};
+$('#allBtn').onclick=async()=>{if(allOn&&!(await sure('Switch every code off? Nobody can redeem anything until you switch them back on.','Switch off')))return;try{await admin(allOn?'alloff':'allon');await loadCodes();loadStat();}catch(e){say('#cMsg',e.message,'bad');}};
 async function delWhere(f,what){const ids=CODES.filter(([id,r])=>f(stOf(r))&&r.k!=='badge').map(c=>c[0]);if(!ids.length)return say('#cMsg','No '+what+' codes.');
-  if(!confirm('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?'))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
+  if(!(await sure('Delete '+ids.length+' '+what+' code'+(ids.length>1?'s':'')+'?','Delete')))return;try{for(let i=0;i<ids.length;i+=200)await admin('del',ids.slice(i,i+200));await loadCodes();say('#cMsg','Deleted '+ids.length+'.','ok');}catch(e){say('#cMsg',e.message,'bad');}}
 $('#cDelDone').onclick=()=>delWhere(s=>s==='done','used-up');
 $('#cDelExp').onclick=()=>delWhere(s=>s==='exp','expired');
 $('#cDelUnused').onclick=()=>delWhere(s=>s==='ready'||s==='off','unused');
@@ -350,7 +425,7 @@ $('#gRefresh').onclick=loadLog;
 async function loadBadges(){say('#bMsg','Loading…');try{const L=(await admin('badges')).badges.sort((a,b)=>(b[1].made||0)-(a[1].made||0)),box=$('#bList');box.textContent='';
     for(const[id,b]of L){const it=document.createElement('div');it.className='item';for(const[t,c]of[['★ '+b.label,'k'],[b.name||'(no name)','c'],[when(b.made),'d'],['code '+b.code,'d']]){const e=document.createElement('span');e.className=c;e.textContent=t;it.append(e);}
       const gap=document.createElement('span');gap.className='sp';it.append(gap);const x=document.createElement('button');x.type='button';x.className='danger small';x.textContent='Take back';
-      x.onclick=async()=>{if(!confirm('Take the '+b.label+' badge back from '+(b.name||'this player')+'?'))return;try{await admin('unbadge',[id]);loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};chips(it,b.ab);const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Edit';rn.onclick=()=>edit('badge',id,b.name,b.label,b.ab,()=>{loadBadges();say('#bMsg','Saved: the change reaches their game right away.','ok');});const nd=document.createElement('button');nd.type='button';nd.className='ghost small';nd.textContent='New device code';
+      x.onclick=async()=>{if(!(await sure('Take the '+b.label+' badge back from '+(b.name||'this player')+'?','Take back')))return;try{await admin('unbadge',[id]);loadBadges();}catch(e){say('#bMsg',e.message,'bad');}};chips(it,b.ab);const rn=document.createElement('button');rn.type='button';rn.className='ghost small';rn.textContent='Edit';rn.onclick=()=>edit('badge',id,b.name,b.label,b.ab,()=>{loadBadges();say('#bMsg','Saved: the change reaches their game right away.','ok');});const nd=document.createElement('button');nd.type='button';nd.className='ghost small';nd.textContent='New device code';
       nd.onclick=async()=>{const r=crypto.getRandomValues(new Uint32Array(6));let cid='';for(const v of r)cid+=A[v%32];try{await admin('mk',[cid],{k:'badgeref',v:id,uses:1,note:'badge for '+(b.name||'')});const c=fmtCode(await codeOf(cid));say('#bMsg','Give '+(b.name||'them')+' this code to get the badge on another device: '+c,'ok');navigator.clipboard&&navigator.clipboard.writeText(c).catch(()=>{});}catch(e){say('#bMsg',e.message,'bad');}};
       it.append(rn,nd,x);box.append(it);}
     say('#bMsg',L.length?'':'No badges given out yet.');}catch(e){say('#bMsg','Could not load: '+e.message,'bad');}}
@@ -364,17 +439,82 @@ setInterval(()=>{if(!KEY||document.hidden||!$('#ed').hidden)return;const t=(docu
 const mk=(tag,cls,t)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(t!==undefined)e.textContent=t;return e;};
 const dur=ms=>{const m=Math.max(0,Math.round((Date.now()-ms)/60000));return m<60?m+' min':m<2880?Math.floor(m/60)+' h '+(m%60)+' min':Math.floor(m/1440)+' days';},ago=ms=>Date.now()-ms<60000?'just now':dur(ms)+' ago';
 const smallBtn=(t,f,cls)=>{const b=mk('button',(cls||'ghost')+' small',t);b.type='button';b.onclick=f;return b;};
-async function loadPlayers(){try{const[pl,rm,bn]=await Promise.all([admin('players'),admin('rooms'),admin('bans')]);
-    const P=pl.players.sort((a,b)=>(a.room||'~').localeCompare(b.room||'~')||a.t0-b.t0),box=$('#pList');box.textContent='';$('#pCount').textContent=P.length+' online';
+let LIVEP=[];
+/* actions on one online player: shared by the players list, the room viewer and profiles */
+function playerBtns(p){const fun=document.createElement('span');fun.className='menu';const fb=smallBtn('Fun ▾',e=>{e.stopPropagation();const open=fun.querySelector('.pop');if(open){open.remove();return;}const pop=mk('div','pop');
+    for(const[t,f]of[['Confetti',()=>doFun('troll',p,{k:'confetti'})],['Shake their screen',()=>doFun('troll',p,{k:'shake'})],['Honk',()=>doFun('troll',p,{k:'honk'})],['Golden vehicle',()=>doFun('skin',p,{k:'gold'})],['Rainbow vehicle',()=>doFun('skin',p,{k:'rainbow'})],['Normal paint',()=>doFun('skin',p,{k:'none'})]]){const b=mk('button','',t);b.type='button';b.onclick=()=>{pop.remove();f();};pop.append(b);}
+    fun.append(pop);setTimeout(()=>addEventListener('click',()=>pop.remove(),{once:true}),0);});fun.append(fb);
+  return[smallBtn('Profile',()=>openProfile(p.dev)),smallBtn('Gift',()=>openGift(p)),smallBtn('Message',()=>msgTo(p)),fun,
+    smallBtn('Kick',async()=>{const v=await ask({title:'Kick '+(p.name||'this player'),text:'They leave their room and see your reason.',fields:[{id:'t',label:'Reason (optional)',max:200}],ok:'Kick',danger:true});if(!v)return;try{await admin('kick',[p.id],{text:v.t});note('Kicked '+p.name,'ok');refreshTab();}catch(e){note(e.message,'bad');}}),
+    smallBtn('Ban',async()=>{const v=await ask({title:'Ban '+(p.name||'this player'),text:'Blocks multiplayer, hosting, codes and sign-in on their device'+(p.acct?' and account':'')+'.',fields:[{id:'t',label:'Reason',max:120}],ok:'Ban',danger:true});if(!v)return;try{await admin('ban',[],{dev:p.dev,acct:p.acct,name:p.name,why:v.t});note('Banned '+p.name,'ok');refreshTab();}catch(e){note(e.message,'bad');}},'danger')];}
+async function doFun(act,p,d){try{const r=await admin(act,[p.id],d);note(r.n?'Done: '+(p.name||'player'):'They went offline',r.n?'ok':'bad');}catch(e){note(e.message,'bad');}}
+async function msgTo(p){const v=await ask({title:'Message '+(p.name||'this player'),fields:[{id:'t',label:'Message',type:'area',max:300}],ok:'Send'});if(!v||!v.t.trim())return;try{const r=await admin('msg',[],{to:[p.id],text:v.t.trim()});note(r.n?'Sent':'They went offline',r.n?'ok':'bad');}catch(e){note(e.message,'bad');}}
+async function openGift(p){const opts=[['','No vehicle']].concat(VLIST.slice().sort((a,b)=>a.nat.localeCompare(b.nat)||a.tier-b.tier).map(v=>[v.id,v.nat.toUpperCase()+' · T'+v.tier+' · '+v.name]));
+  const v=await ask({title:'Gift for '+(p.name||'this player'),text:'Arrives in their game right away with confetti.',fields:[{id:'rp',label:'RP',type:'number',value:'0'},{id:'veh',label:'Vehicle',type:'select',options:opts},{id:'badge',label:'Badge text (optional, gives a badge for their callsign)',max:16},{id:'text',label:'Message (optional)',max:200}],ok:'Send gift'});
+  if(!v)return;const d={rp:Math.max(0,Math.min(1e6,Math.round(+v.rp||0))),veh:v.veh,badge:v.badge.trim(),text:v.text.trim()};if(!d.rp&&!d.veh&&!d.badge)return note('Nothing to give','bad');
+  try{const r=await admin('gift',[p.id],d);note(r.n?'Gift delivered to '+p.name:'They went offline',r.n?'ok':'bad');}catch(e){note(e.message,'bad');}}
+/* player profile: history plus notes */
+async function openProfile(dev){if(!dev)return note('No history for this player yet','bad');let j;try{j=await admin('pget',[],{dev});}catch(e){return note(e.message,'bad');}const P=j.p,S=sheet(P.names[P.names.length-1]||'Player',true);
+  const kv=mk('div','kv'),row=(k,v)=>kv.append(mk('span','',k),mk('span','',v));
+  row('Status',j.live?'Online · '+(j.live.mode==='host'?'hosting '+j.live.room:j.live.mode==='guest'?'in room '+j.live.room:'solo')+' · '+(j.live.st==='hangar'?'hangar':'wave '+j.live.wave):'Offline');
+  row('Callsigns',P.names.join(', ')||'—');row('Account',j.acct?j.acct.name+' (since '+when(j.acct.made)+')':'none');row('First seen',P.first?when(P.first):'—');row('Last seen',P.last?when(P.last):'now');
+  row('Sessions',String(P.sess||0));row('Time played',dur(Date.now()-(P.mins||0)*60000));row('Best wave',String(Math.max(P.best||0,j.acct?j.acct.best:0)));row('Kills',String((P.kills||0)+(j.live?j.live.kills:0)));row('Device',P.dev);
+  if(j.bans.length)row('Bans',j.bans.map(b=>when(b.t)+': '+(b.why||'no reason')).join(' · '));S.c.append(kv);
+  if((P.codes||[]).length){S.c.append(mk('h2','','Codes redeemed'));const L=mk('div','list');for(const c of P.codes.slice().reverse()){const it=mk('div','item');it.append(mk('span','d',when(c.t)),mk('span','c',c.id),mk('span','k',String(c.p).replace(/^rp:(\d+)/,(m,n)=>(+n).toLocaleString()+' RP').replace(/^veh:(\w+)/,(m,v)=>VEH[v]||v)));L.append(it);}S.c.append(L);}
+  const l=mk('label','','Your notes');const ta=document.createElement('textarea');ta.value=P.note||'';ta.maxLength=1000;l.append(ta);const sv=smallBtn('Save notes',async()=>{try{await admin('pnote',[],{dev,note:ta.value});note('Notes saved','ok');}catch(e){note(e.message,'bad');}},'');S.c.append(l,sv);
+  if(j.live){const b=mk('div','btns');const lp=LIVEP.find(x=>x.id===j.live.id)||{id:j.live.id,name:j.live.name,dev,acct:P.acct};b.append(...playerBtns(lp).filter((x,i)=>i>0));S.c.append(b);}}
+/* room viewer: live details from the host every few seconds */
+async function openRoom(code){const S=sheet('Room '+code,true),body=mk('div');S.c.append(body);let on=true;S.d.onclose=()=>{on=false;};
+  const top=mk('div','btns');top.append(smallBtn('Drop in as Commander',()=>dropIn(code),''),smallBtn('Confetti for the room',async()=>{const j=await admin('watch',[],{code});const ids=j.players.map(p=>p.id);if(ids.length){await admin('troll',ids,{k:'confetti'});note('Confetti!','ok');}}));S.c.insertBefore(top,body);
+  const tick=async()=>{if(!on)return;try{const j=await admin('watch',[],{code});body.textContent='';const r=j.room,d=j.detail;
+      if(!r&&!d&&!j.players.length){body.append(mk('p','','This room has closed.'));return;}
+      const kv=mk('div','kv'),row=(k,v)=>kv.append(mk('span','',k),mk('span','',v));if(r)row('Host',r.name+' · '+r.n+'/'+r.max+(r.lock?' · locked':''));
+      if(d){row('Battle',d.w?('wave '+d.w+(d.ph?' · break between waves':' · '+d.left+' enemies left')):'in the hangar');if(d.wx&&d.wx!=='clear')row('Weather',d.wx);if(d.ob)row('Objective',d.ob);}else row('Details',j.age===null?'asking the host… (their game needs the latest version)':'waiting for the host…');body.append(kv);
+      if(d&&d.p.length){const t=mk('table','tbl'),h=document.createElement('tr');for(const x of['Player','Vehicle','Kills','Alive','Ping','RP',''])h.append(mk('th','',x));t.append(h);
+        for(const[n,v,k,a,ping,rp]of d.p){const tr=document.createElement('tr');for(const x of[n,VEH[v]||v,k,a?'yes':'dead',ping?ping+' ms':'host',Number(rp).toLocaleString()])tr.append(mk('td','',String(x)));const td=mk('td');const lp=LIVEP.find(q=>q.name===n&&q.room===code);if(lp)td.append(smallBtn('Message',()=>msgTo(lp)),smallBtn('Kick',async()=>{if(await sure('Kick '+n+'?','Kick')){await admin('kick',[lp.id],{text:''});note('Kicked','ok');}}));tr.append(td);t.append(tr);}body.append(t);}}
+    catch(e){body.textContent=e.message;}tick.n=(tick.n||0)+1;setTimeout(tick,tick.n<3?1200:4000);};tick();}
+async function dropIn(code){try{const j=await admin('cmd',[],{code});window.open(new URL('./?cmd='+encodeURIComponent(j.tk)+'&room='+code,location.href).href,'_blank','noopener');note('Opening the game as the Commander (invisible, immortal B-52 with unlimited bombs)','ok');}catch(e){note(e.message,'bad');}}
+async function loadPlayers(){try{const[pl,rm,bn]=await Promise.all([admin('players'),admin('rooms'),admin('bans')]);LIVEP=pl.players;
+    const P=pl.players.slice().sort((a,b)=>(a.room||'~').localeCompare(b.room||'~')||a.t0-b.t0),box=$('#pList');box.textContent='';$('#pCount').textContent=P.length+' online';
     for(const p of P){const it=mk('div','item');it.append(mk('span','dot'),mk('span','c',p.name||'(no name)'));if(p.badge)it.append(mk('span','chip gold','★ '+p.badge));if(p.an)it.append(mk('span','chip green','☁ '+p.an));
-      it.append(mk('span','d',p.mode==='host'?'hosting '+p.room:p.mode==='guest'?'in room '+p.room:'solo'),mk('span','d',p.st==='hangar'?'in hangar':'wave '+p.wave),mk('span','d',VEH[p.veh]||p.veh||''),mk('span','d','online '+dur(p.t0)),mk('span','d','build '+(p.ver||'dev')),mk('span','sp'));
-      it.append(smallBtn('Message',async()=>{const t=prompt('Message to '+(p.name||'this player')+':');if(!t)return;try{const r=await admin('msg',[],{to:[p.id],text:t});say('#pMsg',r.n?'Sent.':'They went offline.','ok');}catch(e){say('#pMsg',e.message,'bad');}}),
-        smallBtn('Kick',async()=>{const t=prompt('Kick '+(p.name||'this player')+' out of multiplayer? Reason (optional):','');if(t===null)return;try{await admin('kick',[p.id],{text:t});say('#pMsg','Kicked.','ok');loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}}),
-        smallBtn('Ban',async()=>{const t=prompt('Ban '+(p.name||'this player')+' from multiplayer and accounts? Reason:','');if(t===null)return;try{await admin('ban',[],{dev:p.dev,acct:p.acct,name:p.name,why:t});say('#pMsg','Banned.','ok');loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}},'danger'));box.append(it);}
+      it.append(mk('span','d',p.mode==='host'?'hosting '+p.room:p.mode==='guest'?'in room '+p.room:'solo'),mk('span','d',p.st==='hangar'?'in hangar':'wave '+p.wave),mk('span','d',VEH[p.veh]||p.veh||''),mk('span','d','online '+dur(p.t0)),mk('span','d','build '+(p.ver||'dev')),mk('span','sp'),...playerBtns(p));box.append(it);}
     if(!P.length)box.append(mk('p','','Nobody is online right now.'));
-    const rb=$('#rList');rb.textContent='';for(const r of rm.rooms){const it=mk('div','item');it.append(mk('span','c',r.code),mk('span','k',r.name),mk('span','d',r.n+'/'+r.max+' players'),mk('span','d',r.st?'wave '+r.wave:'in hangar'),mk('span','d',r.lock?'locked':'open'));rb.append(it);}if(!rm.rooms.length)rb.append(mk('p','','No listed rooms.'));
-    const bb=$('#banList');bb.textContent='';for(const x of bn.bans.slice().reverse()){const it=mk('div','item');it.append(mk('span','c',x.name||'(no name)'),mk('span','d',when(x.t)),mk('span','d',x.why||'no reason'),mk('span','sp'),smallBtn('Unban',async()=>{try{await admin('unban',[x.id]);loadPlayers();}catch(e){say('#pMsg',e.message,'bad');}}));bb.append(it);}if(!bn.bans.length)bb.append(mk('p','','Nobody is banned.'));}
+    const rb=$('#rList');rb.textContent='';for(const r of rm.rooms){const it=mk('div','item');it.append(mk('span','c',r.code),mk('span','k',r.name),mk('span','d',r.n+'/'+r.max+' players'),mk('span','d',r.st?'wave '+r.wave:'in hangar'),mk('span','d',r.lock?'locked':'open'),mk('span','sp'),smallBtn('View',()=>openRoom(r.code)),smallBtn('Drop in',()=>dropIn(r.code)));rb.append(it);}if(!rm.rooms.length)rb.append(mk('p','','No listed rooms.'));
+    const bb=$('#banList');bb.textContent='';for(const x of bn.bans.slice().reverse()){const it=mk('div','item');it.append(mk('span','c',x.name||'(no name)'),mk('span','d',when(x.t)),mk('span','d',x.why||'no reason'),mk('span','sp'),smallBtn('Profile',()=>openProfile(x.dev)),smallBtn('Unban',async()=>{try{await admin('unban',[x.id]);note('Unbanned','ok');loadPlayers();}catch(e){note(e.message,'bad');}}));bb.append(it);}if(!bn.bans.length)bb.append(mk('p','','Nobody is banned.'));}
   catch(e){say('#pMsg','Could not load: '+e.message,'bad');}}
+async function searchHistory(){const box=$('#phList');box.textContent='';try{const j=await admin('plist',[],{q:$('#phQ').value.trim()});for(const p of j.list){const it=mk('div','item');it.append(mk('span','c',p.names[p.names.length-1]||'?'));if(p.names.length>1)it.append(mk('span','d','aka '+p.names.slice(0,-1).join(', ')));if(p.an)it.append(mk('span','chip green','☁ '+p.an));if(p.note)it.append(mk('span','chip gold','note'));
+    it.append(mk('span','d','last seen '+ago(p.last)),mk('span','d',p.sess+' sessions'),mk('span','d','best wave '+p.best),mk('span','sp'),smallBtn('Profile',()=>openProfile(p.dev)));box.append(it);}if(!j.list.length)box.append(mk('p','','Nobody found. History builds up as players close their game.'));}catch(e){note(e.message,'bad');}}
+$('#phGo').onclick=searchHistory;$('#phQ').addEventListener('keydown',e=>{if(e.key==='Enter')searchHistory();});
+/* dashboard */
+const ACTN={gift:'Gift',event:'Event',troll:'Fun',skin:'Paint job',cmd:'Commander drop-in',pnote:'Note',ban:'Ban',unban:'Unban',kick:'Kick',msg:'Message',cfgset:'Settings saved',mk:'Code made',del:'Code deleted',set:'Code edited',unbadge:'Badge taken back',rebadge:'Badge edited',acctset:'Save edited',acctpw:'Password reset',acctdel:'Account deleted',lbhide:'Leaderboard',alloff:'All codes off',allon:'All codes on',off:'Code off',on:'Code on'};
+const actTxt=x=>{let d='';try{const o=JSON.parse(x.d||'{}');d=o.k||o.text||o.why||o.name||(o.rp?o.rp+' RP':'')||'';}catch(e){}return(ACTN[x.a]||x.a)+(d?' · '+String(d).slice(0,60):'');};
+async function loadDash(){try{const j=await admin('dash');const t=j.days[0]||{},y=j.days[1]||{},k=$('#dKpi');k.textContent='';
+    const tile=(n,l,sub)=>{const e=mk('div','kpi');e.append(mk('b','',Number(n).toLocaleString()),mk('span','',l));if(sub)e.append(mk('span','',' · '+sub));k.append(e);};
+    tile(j.online,'online now');tile(j.inBattle,'in battle');tile(j.rooms.length,'open rooms');tile(t.u||0,'players today',y.u!==undefined?(t.u>=y.u?'+':'')+((t.u||0)-(y.u||0))+' vs yesterday':'');tile(j.accts,'accounts');tile(t.r||0,'codes today');tile(t.w||0,'waves today');tile(j.bans,'bans');
+    const c=$('#dChips');c.textContent='';const chip=(t,on)=>c.append(mk('span','chip '+(on?'on':'off'),t));const rpOn=j.cfg.rp.mul>1&&(!j.cfg.rp.until||Date.now()<j.cfg.rp.until);
+    chip(j.cfg.maint.on?'Maintenance ON':'Multiplayer open',!j.cfg.maint.on);chip(j.all?'Codes on':'Codes OFF',j.all);chip(rpOn?j.cfg.rp.mul+'× RP'+(j.cfg.rp.until?' · '+dur(Date.now()-(j.cfg.rp.until-Date.now()))+' left':''):'No RP event',rpOn);chip(j.cfg.news.on?'News shown':'No news',j.cfg.news.on);
+    const q=$('#dQuick');q.textContent='';
+    q.append(smallBtn(j.cfg.maint.on?'End maintenance':'Start maintenance',async()=>{if(!j.cfg.maint.on&&!(await sure('Close multiplayer for everyone now? Rooms close and battles in rooms end.','Start maintenance')))return;const c2=j.cfg;c2.maint.on=!c2.maint.on;try{await admin('cfgset',[],c2);note('Saved and live','ok');loadDash();}catch(e){note(e.message,'bad');}},j.cfg.maint.on?'':'danger'),
+      smallBtn(j.all?'Codes off':'Codes on',async()=>{try{await admin(j.all?'alloff':'allon');note('Saved','ok');loadDash();}catch(e){note(e.message,'bad');}}),
+      smallBtn('Events',()=>openTab('events')),smallBtn('Confetti for everyone',async()=>{const r=await admin('troll',[],{k:'confetti'});note('Confetti on '+r.n+' screens','ok');}));
+    const rb=$('#dRooms');rb.textContent='';$('#dRoomN').textContent=j.rooms.length?'· '+j.rooms.length+' open':'';for(const r of j.rooms){const it=mk('div','item');it.append(mk('span','c',r.code),mk('span','k',r.name),mk('span','d',r.n+'/'+r.max),mk('span','d',r.st?'wave '+r.wave:'hangar'),mk('span','sp'),smallBtn('View',()=>openRoom(r.code)),smallBtn('Drop in',()=>dropIn(r.code)));rb.append(it);}if(!j.rooms.length)rb.append(mk('p','','No open rooms right now.'));
+    const lg=$('#dLog');lg.textContent='';for(const x of j.log){const it=mk('div','item');it.append(mk('span','d',when(x.t)),mk('span','k',actTxt(x)));lg.append(it);}if(!j.log.length)lg.append(mk('p','','Nothing yet.'));
+    const vb=$('#dVers');vb.textContent='';const V=Object.entries(j.vers).sort((a,b)=>(+b[0]||0)-(+a[0]||0));for(const[v,n]of V){const it=mk('div','item');it.append(mk('span','c','Build '+v),mk('span','d',n+' player'+(n>1?'s':'')));vb.append(it);}if(!V.length)vb.append(mk('p','','Nobody online.'));}
+  catch(e){note('Could not load the dashboard: '+e.message,'bad');}}
+$('#dMsgGo').onclick=async()=>{const t=$('#dMsg').value.trim();if(!t)return;try{const r=await admin('msg',[],{text:t});$('#dMsg').value='';note('Sent to '+r.n+' game'+(r.n===1?'':'s'),'ok');}catch(e){note(e.message,'bad');}};
+/* events */
+for(const b of document.querySelectorAll('[data-ev]'))b.onclick=async()=>{const k=b.dataset.ev,N={boss:'Send a boss tank to every battle?',raid:'Start an air raid in every battle?',night:'Make it night in every battle?',storm:'Start a storm in every battle?',rp:'Start a '+$('#evMul').value+'× RP event for '+$('#evMins').selectedOptions[0].textContent+'?'};
+  if(!(await sure(N[k],'Go',false)))return;try{const r=await admin('event',[],{k,text:$('#evText').value.trim(),mul:+$('#evMul').value,mins:+$('#evMins').value});note('Sent to '+(r.live||0)+' game'+(r.live===1?'':'s'),'ok');}catch(e){note(e.message,'bad');}};
+for(const b of document.querySelectorAll('[data-fun]'))b.onclick=async()=>{try{const r=await admin('troll',[],{k:b.dataset.fun});note('Done on '+r.n+' screen'+(r.n===1?'':'s'),'ok');}catch(e){note(e.message,'bad');}};
+/* leaderboard */
+async function loadLb(){const box=$('#lbCols');box.textContent='';try{const L=(await admin('lb')).lb;for(const[k,h,f]of[['best','Best wave',v=>'wave '+v],['prog','Progress',v=>Number(v).toLocaleString()+' RP'],['kills','Kills',v=>String(v)]]){const c=mk('section','card');c.append(mk('h2','',h));
+      L[k].forEach((r,i)=>{const it=mk('div','item');if(r.hide)it.style.opacity='.45';it.append(mk('span','d',String(i+1)),mk('span','c',r.n),mk('span','k',f(r[k])),mk('span','sp'),smallBtn(r.hide?'Show':'Hide',async()=>{await admin('lbhide',[r.id],{hide:!r.hide});note(r.hide?'Shown again':'Hidden from the leaderboard','ok');loadLb();}));c.append(it);});if(!L[k].length)c.append(mk('p','','No accounts yet.'));box.append(c);}}
+  catch(e){say('#lbMsg',e.message,'bad');}}
+$('#lbRefresh').onclick=loadLb;
+async function loadAlog(){const box=$('#alList');box.textContent='';try{const L=(await admin('alog')).log.slice().reverse();for(const x of L){const it=mk('div','item');it.append(mk('span','d',when(x.t)),mk('span','k',actTxt(x)));if(x.ids&&x.ids.length)it.append(mk('span','d',x.ids.join(', ')));box.append(it);}if(!L.length)box.append(mk('p','','Nothing yet.'));}catch(e){say('#alMsg',e.message,'bad');}}
+$('#alRefresh').onclick=loadAlog;
+const curTab=()=>((document.querySelector('.tabs button[aria-selected=true]')||{}).dataset||{}).tab;
+function refreshTab(){const t=curTab();({players:loadPlayers,dash:loadDash})[t]?.();}
 $('#mAllGo').onclick=async()=>{const t=$('#mAll').value.trim();if(!t)return;try{const r=await admin('msg',[],{text:t});$('#mAll').value='';say('#pMsg','Sent to '+r.n+' game'+(r.n===1?'':'s')+'.','ok');}catch(e){say('#pMsg',e.message,'bad');}};
 /* accounts and their saves */
 let ACCTS=[],SV=null;
@@ -383,8 +523,8 @@ function renderAccts(){const q=$('#aFind').value.trim().toLowerCase(),box=$('#aL
   for(const a of ACCTS.filter(a=>!q||a.name.toLowerCase().includes(q))){const it=mk('div','item');it.append(mk('span','c',a.name));if(a.badge)it.append(mk('span','chip gold','★ badge'));
     it.append(mk('span','k',Math.round(a.rp).toLocaleString()+' RP'),mk('span','d',a.veh+' vehicles'),mk('span','d','best wave '+a.best),mk('span','d','seen '+ago(a.last||a.made)),mk('span','d','since '+when(a.made)),mk('span','sp'),
       smallBtn('Edit save',()=>openSave(a.id)),
-      smallBtn('New password',async()=>{const pw=prompt('New password for '+a.name+' (6+ characters). They are signed out everywhere.');if(!pw)return;if(pw.length<6)return say('#aLMsg','Too short.','bad');try{await admin('acctpw',[a.id],{pw});say('#aLMsg','Password changed for '+a.name+'.','ok');}catch(e){say('#aLMsg',e.message,'bad');}}),
-      smallBtn('Delete',async()=>{if(!confirm('Delete the account '+a.name+' and its cloud save? Their device keeps its local copy.'))return;try{await admin('acctdel',[a.id]);loadAccts();}catch(e){say('#aLMsg',e.message,'bad');}},'danger'));box.append(it);}}
+      smallBtn('New password',async()=>{const v=await ask({title:'New password for '+a.name,text:'They are signed out on every device.',fields:[{id:'pw',label:'Password (6+ characters)',type:'text'}],ok:'Set password'});const pw=v&&v.pw;if(!pw)return;if(pw.length<6)return say('#aLMsg','Too short.','bad');try{await admin('acctpw',[a.id],{pw});say('#aLMsg','Password changed for '+a.name+'.','ok');}catch(e){say('#aLMsg',e.message,'bad');}}),
+      smallBtn('Delete',async()=>{if(!(await sure('Delete the account '+a.name+' and its cloud save? Their device keeps its local copy.','Delete')))return;try{await admin('acctdel',[a.id]);loadAccts();}catch(e){say('#aLMsg',e.message,'bad');}},'danger'));box.append(it);}}
 $('#aFind').oninput=renderAccts;$('#aRefresh').onclick=loadAccts;
 async function openSave(id){try{const a=(await admin('acctget',[id])).acct;const sv=a.save&&Array.isArray(a.save.slots)?a.save:{active:0,slots:[null,null,null]};SV={id,name:a.name,save:sv,slot:sv.active||0};$('#svH').textContent=a.name;renderSave();$('#sv').hidden=false;$('#sv').scrollIntoView({behavior:'smooth'});say('#svMsg','');}catch(e){say('#aLMsg',e.message,'bad');}}
 const STARTS=()=>VLIST.filter(v=>v.start).map(v=>v.id);
@@ -410,7 +550,7 @@ async function loadStats(){say('#stMsg','Loading…');try{const j=await admin('s
     const V={};for(const d of D)for(const[id,n]of Object.entries(d.vh||{}))V[id]=(V[id]||0)+n;const top=Object.entries(V).sort((a,b)=>b[1]-a[1]).slice(0,12),mx=Math.max(1,...top.map(x=>x[1])),tv=$('#topV');tv.textContent='';
     for(const[id,n]of top){const r=mk('div','hbar'),bar=mk('div'),i=mk('i');i.style.width=Math.round(n/mx*100)+'%';bar.append(i);r.append(mk('span','',VEH[id]||id),bar,mk('span','',String(n)));tv.append(r);}
     say('#stMsg',D.length?'':'No data yet: stats start counting from today.');}catch(e){say('#stMsg','Could not load: '+e.message,'bad');}}
-setInterval(()=>{if(!KEY||document.hidden)return;const t=(document.querySelector('.tabs button[aria-selected=true]')||{}).dataset;if(t&&t.tab==='players')loadPlayers();},6000);
+setInterval(()=>{if(!KEY||document.hidden||document.querySelector('.dlg'))return;const t=curTab();if(t==='players')loadPlayers();if(t==='dash')loadDash();},8000);
 show(load().ct?'#lock':'#setup');
 </script>
 </body>
