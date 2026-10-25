@@ -1234,6 +1234,27 @@ function genMap(seed){
 }
 
 
+
+/* ================= weather =================
+   Each wave after the first may bring rain, fog or night. All mild: they shorten how far enemy tanks can spot you
+   (firing or burning gives you away), and night lights come from your own vehicles, fires and explosions. */
+const WX=['clear','rain','fog','night'],WXL={rain:'RAIN',fog:'FOG',night:'NIGHT'};let weather='clear',nightC=null;
+function pickWeather(n){if(n<=1)return 'clear';const r=Math.random();return r<.55?'clear':r<.75?'rain':r<.87?'fog':'night';}
+const spotRange=()=>weather==='rain'?1150:weather==='fog'?820:weather==='night'?720:1e9;
+const spotted=(p,d)=>d<spotRange()||(p.firedAt&&time-p.firedAt<4)||p.fire>0;
+function weatherFX(){if(weather==='clear'||state==='hangar')return;ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(weather==='rain'){ctx.fillStyle='rgba(20,26,36,.14)';ctx.fillRect(0,0,VW,VH);ctx.strokeStyle='rgba(190,205,220,.28)';ctx.lineWidth=1;ctx.beginPath();const n=COARSE?70:120;
+    for(let i=0;i<n;i++){const x=((i*173.3+time*260)%(VW+120))-60,y=((i*97.1+time*900)%(VH+80))-40;ctx.moveTo(x,y);ctx.lineTo(x-6,y+18);}ctx.stroke();}
+  else if(weather==='fog'){const v=viewer()||player,[cx,cy]=v?W2S(v.x,v.y):[VW/2,VH/2],g=ctx.createRadialGradient(cx,cy,380*ZOOM,cx,cy,Math.max(VW,VH)*.8);g.addColorStop(0,'rgba(190,195,188,0)');g.addColorStop(1,'rgba(190,195,188,.55)');ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);}
+  else{const W=Math.ceil(VW),H=Math.ceil(VH);if(!nightC)nightC=document.createElement('canvas');if(nightC.width!==W||nightC.height!==H){nightC.width=W;nightC.height=H;}const g=nightC.getContext('2d');
+    g.globalCompositeOperation='source-over';g.clearRect(0,0,W,H);g.fillStyle='rgba(6,10,26,.58)';g.fillRect(0,0,W,H);g.globalCompositeOperation='destination-out';
+    const light=(x,y,r,a)=>{const[sx,sy]=W2S(x,y),R=r*ZOOM;if(sx<-R||sy<-R||sx>W+R||sy>H+R)return;const gr=g.createRadialGradient(sx,sy,0,sx,sy,R);gr.addColorStop(0,'rgba(0,0,0,'+a+')');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(sx-R,sy-R,R*2,R*2);};
+    for(const t of tanks){if(t.team==='p'&&t.alive)light(t.x,t.y,t.air?200:260,1);else if(t.fire>0||t.burn>0)light(t.x,t.y,180,.9);}
+    let n=0;for(const q of parts){if(!q.glow||n>60)continue;n++;light(q.x,q.y,Math.max(40,q.size*7),.8);}
+    for(const sh of shells)if(sh.kind==='direct'&&sh.dist<160)light(sh.x,sh.y,90,.7);
+    for(const f of fields)if(f.team==='p')light(f.x+f.w/2,f.y+f.h/2,f.w*.6,.6);
+    ctx.drawImage(nightC,0,0,VW,VH);}
+  ctx.restore();}
 /* ================= the railway and the road traffic =================
    Every minute or two a train crosses on the railway: moving cover, and a target (the locomotive is worth RP, tank
    wagons explode). Civilian trucks drive the roads; tanks crush them, and fuel trucks go up like a fuel dump.
@@ -1788,7 +1809,7 @@ function aiUpdate(t,dt){
   const p=A.target;if(!p){t.throttle=0;t.steer=0;return;}
   const dx=p.x-t.x,dy=p.y-t.y,dist=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
   A.think-=dt;
-  if(A.think<=0){A.think=rand(.3,.5);const nt=aiTarget(t);if(nt&&nt!==A.target){A.target=nt;pickGoal(t);}A.los=clearLine(t.x,t.y,p.x,p.y)&&!(dist>320&&hiddenIn(p));A.trees=A.los?treesOnLine(t.x,t.y,p.x,p.y):0;
+  if(A.think<=0){A.think=rand(.3,.5);const nt=aiTarget(t);if(nt&&nt!==A.target){A.target=nt;pickGoal(t);}A.los=clearLine(t.x,t.y,p.x,p.y)&&!(dist>320&&hiddenIn(p))&&spotted(p,dist);A.trees=A.los?treesOnLine(t.x,t.y,p.x,p.y):0;
     if(A.los){A.noLos=0;if(A.hunt){A.hunt=false;pickGoal(t);}}
     const moved=A.goal?Math.hypot(A.ref.x-p.x,A.ref.y-p.y):999;
     if(!T.arty&&A.noLos>30&&!nearHuman(t.x,t.y,800)&&relocate(t))return;
@@ -1897,6 +1918,7 @@ function spawnPoint(){
 }
 function startWave(n){
   wave=n;phase='combat';votes.clear();closePick();clearWrecks(true);
+  weather=pickWeather(n);if(weather!=='clear')sayAll({rain:'Rain moves in: enemies spot you a little later',fog:'Fog rolls in: enemies only spot you up close',night:'Night falls: stay in the dark. Firing gives your position away'}[weather],'#8ab4d8');
   if(isMilestone(n)){runCp=Math.max(runCp,n);if(n>(save.checkpoint||0)){save.checkpoint=n;persist();}sayAll('Checkpoint: wave '+n+'. If you are wiped out you can continue from here.','#8bd66e');netEv({k:'cp',w:n});}
   const P=playerCount(),base=1+Math.floor((n-1)*.6),count=Math.min(Math.round(base*(1+.6*(P-1)))+(P>1?Math.floor(n/4):0),9+4*(P-1),44);
   const arty=n>=4&&Math.random()<.35;
@@ -2208,7 +2230,7 @@ function start(fromWave){
   statsHost=newStats();allDeadT=-1;menuOpen=false;net.events=[];net.input=null;net.lastClicks=undefined;net.lastPicks=undefined;
   const squad=net.mode==='host'?peerList().filter(pe=>tget(pe.tank)&&(!tget(pe.tank).admin||peAll(pe))):[];for(const pe of net.peers.values()){pe.t=null;pe.stats=null;}votes.clear();
   setMapSize(...mapDims(1+squad.length));
-  const seed=(Math.random()*1e9)|0;curSeed=seed;genMap(seed);trucksReset();
+  const seed=(Math.random()*1e9)|0;curSeed=seed;genMap(seed);trucksReset();weather="clear";
   const F0=fields[0];player=T.air?makeTank(T,F0.x+F0.w*.2,F0.y+F0.h/2,'p'):makeTank(T,WW/2,WH/2,'p');player.a=T.air?0:-Math.PI/2;player.aimAt=player.a;if(T.air)player.want=0;player.stats=statsHost;tanks.push(player);
   squad.forEach((pe,i)=>{const a=-Math.PI/2+(i+1)*TAU/(squad.length+1),r=110+Math.floor(i/6)*90,sp=freeSpotNear(WW/2+Math.cos(a)*r,WH/2+Math.sin(a)*r);spawnPeerTank(pe,sp.x,sp.y,-Math.PI/2);pe.stats=newStats();pe.t.stats=pe.stats;});
   computeReach(player.x,player.y);rebuildDynNav();
@@ -2812,6 +2834,7 @@ function draw(dt){
   if(mapView&&player){ctx.strokeStyle='#8bd66e';ctx.lineWidth=2/ZOOM;ctx.beginPath();ctx.arc(player.x,player.y,16/ZOOM,0,TAU);ctx.stroke();}
   for(const f of floaters){ctx.globalAlpha=clamp(f.life,0,1);ctx.font='700 '+(15/ZOOM)+'px "Saira Condensed",sans-serif';ctx.lineWidth=3/ZOOM;ctx.strokeStyle='rgba(10,12,8,.8)';ctx.strokeText(f.text,f.x,f.y);ctx.fillStyle=f.color;ctx.fillText(f.text,f.x,f.y);}
   ctx.globalAlpha=1;
+  weatherFX();
   if(state!=='hangar'&&player)hud();
   if(flash>0){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='rgba(255,252,240,'+Math.min(1,flash*1.2)+')';ctx.fillRect(0,0,VW,VH);}
 }
@@ -2969,7 +2992,7 @@ function hud(){lockHUD();terrainHUD();
       ctx.fillStyle='rgba(16,19,13,.7)';ctx.fillRect(lx-w/2,ly-10,w,14);ctx.fillStyle='#8bd66e';ctx.fillText(lab,lx,ly);}
     ctx.textAlign='left';}
   /* wave status */
-  const left=enemiesLeft(),canN=!touch&&net.mode!=='guest',wtxt=phase==='break'?'BREAK · VOTE TO START'+(canN?' (N)':''):left+(left===1?' HOSTILE':' HOSTILES')+(swarmK>1.05&&phase!=='break'?' · OUTNUMBERED +'+Math.round((swarmK-1)*100)+'%':'');
+  const left=enemiesLeft(),canN=!touch&&net.mode!=='guest',wtxt=phase==='break'?'BREAK · VOTE TO START'+(canN?' (N)':''):left+(left===1?' HOSTILE':' HOSTILES')+(WXL[weather]?' · '+WXL[weather]:'')+(swarmK>1.05&&phase!=='break'?' · OUTNUMBERED +'+Math.round((swarmK-1)*100)+'%':'');
   const ping=net.mode==='host'?(net.connected?humans().length+' PLAYERS · ROOM '+net.code:'ROOM '+net.code+' OPEN'):net.mode==='guest'?(net.connected?(net.rtt?'PING '+Math.round(net.rtt)+' MS':'PING …'):'DISCONNECTED'):'';
   if(!compact&&VW>=1000){const w=470;ctx.fillStyle='rgba(16,19,13,.75)';ctx.fillRect(VW/2-w/2,top,w,42);ctx.textAlign='left';ctx.fillStyle='#d8cfa2';ctx.font='19px "Saira Stencil One",Impact,sans-serif';ctx.fillText('WAVE '+wave,VW/2-w/2+12,top+28);
     ctx.font='600 12px "IBM Plex Mono",monospace';ctx.fillStyle=phase==='break'?'#8bd66e':'#ee5d50';ctx.fillText(wtxt,VW/2-w/2+104,top+26);ctx.textAlign='right';ctx.fillStyle='#f2a23a';ctx.fillText(fmt(save.rp)+' RP',VW/2+w/2-12,top+19);ctx.font='600 10px "IBM Plex Mono",monospace';ctx.fillStyle=rpFlash>0?'#8bd66e':'#8e8a6b';ctx.fillText('+'+fmt(battleRP)+' THIS BATTLE',VW/2+w/2-12,top+34);
@@ -3236,7 +3259,7 @@ function sendSnapshot(){
   const shared=JSON.stringify({e:'snap',w:wave,ph:phase==='break'?1:0,pt:r1(phaseT),l:enemiesLeft(),nc:r1(nukeCD),host:player?player.nid:0,hn,
     tk:tanks.map(packTank),
     sh:shells.map(packShell).filter(Boolean),
-    rt:train?[r1(train.x),train.dir,train.cars.map(c=>(c.k==='loco'?0:c.k==='tank'?1:2)+(c.dead?3:0))]:0,tf:trucks.map(k=>[r1(k.x),r1(k.y),r2(k.a),(k.fuel?1:0)+(k.dead?2:0)]),sw:r2(swarmK),nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
+    rt:train?[r1(train.x),train.dir,train.cars.map(c=>(c.k==='loco'?0:c.k==='tank'?1:2)+(c.dead?3:0))]:0,tf:trucks.map(k=>[r1(k.x),r1(k.y),r2(k.a),(k.fuel?1:0)+(k.dead?2:0)]),wx:WX.indexOf(weather),sw:r2(swarmK),nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
   net.events=[];const head=shared.slice(0,-1);
   for(const pe of list){const me=pe.t?packMe(pe.t):null,ev=pe.events;pe.events=[];
     sendTo(pe,head+',"pr":'+Math.round(pe.rp||0)+',"you":'+(pe.t?pe.t.nid:0)+',"vt":'+JSON.stringify([votes.size,n,votes.has(pe.pid)?1:0,need])+',"me":'+JSON.stringify(me)+',"pev":'+JSON.stringify(ev)+'}');}
@@ -3320,7 +3343,7 @@ function guestStart(m){
 function applySnap(m){
   if(Array.isArray(m.vt))gVotes={n:num(m.vt[0],0,99),of:num(m.vt[1],1,99),me:!!m.vt[2],need:num(m.vt[3],1,99)};
   if(net.room&&m.pr!==undefined)net.room.rp=Math.round(num(m.pr,0,1e9));
-  swarmK=num(m.sw,1,1.8)||1;
+  swarmK=num(m.sw,1,1.8)||1;weather=WX[Math.round(num(m.wx,0,3))]||'clear';
   if(Array.isArray(m.rt)&&Array.isArray(m.rt[2])){const cars=m.rt[2].slice(0,8).map(v=>{v=Math.round(num(v,0,5));return{k:['loco','tank','box'][v%3],dead:v>=3,hp:1};});train={x:num(m.rt[0],-2e4,4e4),dir:m.rt[1]<0?-1:1,cars,sp:0,stopped:true};}else train=null;
   if(Array.isArray(m.tf))trucks=m.tf.slice(0,20).filter(Array.isArray).map(a=>({x:num(a[0],-500,WW+500),y:num(a[1],-500,WH+500),a:num(a[2],-7,7),fuel:!!(a[3]&1),dead:!!(a[3]&2)}));wave=Math.round(num(m.w,0,1e4));phase=m.ph?'break':'combat';phaseT=num(m.pt,0,1e6);gLeft=Math.round(num(m.l,0,999));nukeCD=num(m.nc,0,99);if(m.you)myNid=m.you;hostNid=m.host;
   if(Array.isArray(m.hn)){const nm={};for(const r of m.hn.slice(0,MAX_PLAYERS))if(Array.isArray(r))nm[num(r[0],0,1e9)]=cleanName(r[1])||'Teammate';net.names=nm;}
