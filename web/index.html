@@ -3407,7 +3407,7 @@ function hostData(pe,d){
       for(const k of en.perks||[]){if(/^rp:\d{1,7}$/.test(k)){pe.rp=(pe.rp||0)+clamp(+k.slice(3),1,1e6);ch=true;}else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){(pe.mine||(pe.mine=new Set())).add(T.id);ch=true;}}}
       if(ch){U.add(tk.ticket);net.lobbyKey='';sendLobby(true);}});return;}
   if(d.e==='research'){if(!rateOk(pe.acts,1000,8))return;const T=tget(d.id);if(T)guestResearch(pe,T);net.lobbyKey='';sendLobby(true);return;}
-  if(d.e==='swap'){const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;if(T&&(!T.admin||peAll(pe))){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
+  if(d.e==='swap'){const T=tget(d.tank);if(T&&T.admin&&!peAll(pe)){pe.wantTank=d.tank;sendTo(pe,{e:'sys',text:'Admin vehicles in a room need a badge with that ability or an every-vehicle code. Your game is still checking it: try again in a moment'});}if(T&&(!T.admin||peAll(pe))){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
   if(d.e==='chat'){if(!rateOk(pe.chatIn,5000,6))return;const t=cleanText(d.text);if(!t)return;const who=pe.name||'Guest';addChat(who,t,'them');sfx.ping();
     const j=JSON.stringify({e:'chat',from:who,text:t});for(const o of peerList())if(o!==pe)sendTo(o,j);return;}
   if(d.e==='name'){const n=hostName(pe,cleanName(d.name));if(!n||n===pe.name)return;const old=pe.name;pe.name=n;if(old)sysAll(old+' is now '+n);net.lobbyKey='';sendLobby(true);coopUI();return;}
