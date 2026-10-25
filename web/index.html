@@ -290,7 +290,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       <div class="mp-intro"><span class="tag">Co-op, up to 14 players</span><span class="why" id="coopRules">No nukes or admin tanks in co-op. Guests use the host's vehicles and earn their own RP. When a guest leaves, their leftover RP goes to the host.</span></div>
       <div class="conn"><i class="live" id="connDot"></i><span id="coopStatus">Not connected. Host a room or join a friend's.</span></div>
       <div class="mp-cards" id="coopIdle">
-        <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">Everyone in the room plays on a copy of the save you pick. Only your own progress is kept.</p><div class="row"><select class="field" id="hostSave" aria-label="Save for this room"></select><button class="btn small" id="hostBtn" type="button">Create room</button></div><label class="setting"><input type="checkbox" id="pubRoom"> <span>Show my room in the open rooms list</span></label></div>
+        <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">Needs an account. Everyone in the room plays on a copy of the save you pick. Only your own progress is kept.</p><div class="row"><select class="field" id="hostSave" aria-label="Save for this room"></select><button class="btn small" id="hostBtn" type="button">Create room</button></div><label class="setting"><input type="checkbox" id="pubRoom"> <span>Show my room in the open rooms list</span></label></div>
         <div class="mp-card"><span class="tag">Join</span><h3>Enter a room code</h3><div class="row"><input class="field" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code" enterkeyhint="go"><button class="btn small" id="joinBtn" type="button">Join</button></div><span class="why" id="joinHint">Codes are 6 letters and digits, like K7M2QX.</span></div>
       </div>
       <div class="mp-card rooms" id="roomsCard"><span class="tag">Open rooms</span><div id="roomList" class="room-list"><p class="why">Looking for rooms…</p></div></div>
@@ -2431,7 +2431,7 @@ async function codeCall(path,body){const L=await codeAPIs();if(!L.length)return{
   if(net.mode==='guest'&&net.connected&&RELAY.includes(path))return relayCall(path,body);
   return{ok:false,reason:'net'};}
 /* a guest whose internet can't reach the server (some networks block it) asks the host to pass the request on */
-const RELAY=['/redeem','/badge','/verify','/bchk'];
+const RELAY=['/badge','/verify','/bchk'];
 /* connection test: what this device can and can't reach, as a report the player can copy and send */
 const apiLog=[];function apiErr(url,e){apiLog.push(new Date().toISOString().slice(11,19)+' '+url.replace(/^https:\/\//,'')+' → '+(e&&e.name||'Error')+': '+(e&&e.message||e));if(apiLog.length>8)apiLog.shift();}
 async function probe(url,opt,ms){const t0=performance.now(),ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms||8000);
@@ -2456,9 +2456,9 @@ $('#diagCopy').addEventListener('click',()=>{const t=$('#diagOut').textContent;(
 function relayCall(path,body){body=Object.assign({},body);delete body.tk;const id=net.rq=(net.rq||0)+1;netSend({e:'api',id,p:path,b:body});
   return new Promise(res=>{const W=net.rqW||(net.rqW=new Map());const t=setTimeout(()=>{W.delete(id);res({ok:false,reason:'net'});},15000);W.set(id,r=>{clearTimeout(t);W.delete(id);res(r&&typeof r==='object'?r:{ok:false,reason:'net'});});});}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
-async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
+async function redeem(){if(!store.acct){const m=$('#rdmMsg');m.textContent='Sign in to use codes. ';const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Sign in';b.onclick=openAcct;m.append(b);return;}const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
   const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name,tk:store.acct?store.acct.tk:undefined});
-  if(!r||!r.ok){if(r&&(r.reason==='net'||r.reason==='setup')){msg.textContent='Can\'t reach the code server. ';const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Why?';b.onclick=runDiag;msg.append(b);return;}msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
+  if(!r||!r.ok){if(r&&(r.reason==='net'||r.reason==='setup')){msg.textContent='Can\'t reach the code server. ';const b=document.createElement('button');b.type='button';b.className='btn ghost small';b.textContent='Why?';b.onclick=runDiag;msg.append(b);return;}msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',signin:'Sign in to use codes',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
   const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],mpSlot=net.mode==='off'&&hangarMode==='mp'&&/^[0-2]$/.test(($('#hostSave')||{}).value||'')?+$('#hostSave').value:store.active,slot=()=>net.mode==='host'?save:store.slots[mpSlot]||(store.slots[mpSlot]=freshSave()),inRoom=net.mode==='guest'&&net.connected,where=()=>inRoom?' (this room and slot '+(store.active+1)+')':net.mode==='host'&&net.temp?' (this session)':' in slot '+(mpSlot+1);
   if(inRoom&&perks.some(k=>/^(rp|veh):/.test(k)))netSend({e:'perk',tk:cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket})});
   for(const k of perks){if(typeof k!=='string')continue;
@@ -2586,6 +2586,7 @@ function renderAcct(){const btn=$('#acctBtn'),box=$('#acctBox');if(!btn||!box)re
   const go=el('button',{type:'button',className:'btn small',textContent:'Sign in'}),mk=el('button',{type:'button',className:'btn ghost small',textContent:'Create account'});go.onclick=()=>acctGo(false);mk.onclick=()=>acctGo(true);
   box.append(go,mk,el('span',{className:'why',id:'acMsg'}));$('#acPw').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();acctGo(false);}});}
 $('#acctBtn').addEventListener('click',()=>{const b=$('#acctBox');b.hidden=!b.hidden;renderAcct();});
+function openAcct(){const b=$('#acctBox');b.hidden=false;renderAcct();b.scrollIntoView({behavior:'smooth',block:'center'});const i=$('#acName');if(i&&!store.acct)setTimeout(()=>i.focus(),300);}
 addEventListener('pagehide',cloudNow);document.addEventListener('visibilitychange',()=>{if(document.hidden)cloudNow();});
 /* ================= open rooms =================
    Hosts who leave "show my room" on check in with the server every 20 s; the multiplayer tab lists them. */
@@ -2600,7 +2601,7 @@ function renderRooms(list){const box=$('#roomList');if(!box)return;box.textConte
     const j=el('button',{type:'button',className:'btn small',textContent:'Join',disabled:full||!!r.lock});j.onclick=()=>{$('#joinCode').value=r.code;joinCoop(r.code);};row.append(j);box.append(row);}}
 async function roomUp(down){if(net.mode!=='host'||!net.code)return;if(!net.roomK)net.roomK=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
   if(down||!store.pub){if(net.listed){net.listed=false;codeCall('/room',{op:'down',code:net.code,k:net.roomK});}return;}
-  const mine=store.badge&&BADGE.get(store.badge);net.listed=true;codeCall('/room',{op:'up',code:net.code,k:net.roomK,name:store.name,n:humansCount(),max:MAX_PLAYERS,lock:net.locked?1:0,wave,st:state==='hangar'?0:1,v:PROTO,dev:store.dev,bg:mine&&mine.l||''});}
+  const mine=store.badge&&BADGE.get(store.badge);net.listed=true;codeCall('/room',{op:'up',tk:store.acct?store.acct.tk:'',code:net.code,k:net.roomK,name:store.name,n:humansCount(),max:MAX_PLAYERS,lock:net.locked?1:0,wave,st:state==='hangar'?0:1,v:PROTO,dev:store.dev,bg:mine&&mine.l||''});}
 const humansCount=()=>1+peerList().length;
 setInterval(()=>{if(net.mode==='host')roomUp();},30000);
 {const pb=$('#pubRoom');pb.checked=!!store.pub;pb.addEventListener('change',()=>{store.pub=pb.checked?1:0;persist();roomUp();});}
@@ -3418,6 +3419,7 @@ setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!(liveWs&&liveWs.readyState===1)&&Date.now()-livePoll>5000){livePoll=Date.now();liveCfg();}});checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
+  if(!store.acct){coopStatus('Sign in to host a room (joining works without an account).',true);openAcct();return;}
   if(store.ban){coopStatus('This device is banned from multiplayer'+(store.ban!=='banned'?': '+store.ban:''),true);return;}
   /* the room shows up at once; the version check runs while the room opens (maintenance is already known from LIVE) */
   if(!MP_OK){coopStatus(MP_NO,true);return;}if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}
