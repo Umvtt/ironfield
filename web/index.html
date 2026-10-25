@@ -49,6 +49,11 @@ body.playing canvas#game{cursor:none}
 .news li{overflow-wrap:anywhere}
 .live-bar{border-left-color:var(--ok,#8bd66e)}.live-bar p{margin:0;color:var(--khaki);font-size:16px;line-height:1.35;overflow-wrap:anywhere}.live-bar p.ev{color:var(--signal);font-weight:600}.live-bar p.mt{color:#ee5d50}
 .ab-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.acct{margin:10px 0;padding:12px 14px;border:1px solid rgba(216,207,162,.18);background:rgba(16,19,13,.55);border-radius:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acct .field{width:auto;flex:1 1 140px;min-width:0}.acct p{margin:0;flex-basis:100%}
+.room-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:260px;overflow:auto}
+.room-row{display:flex;align-items:center;gap:10px;padding:6px 8px;background:rgba(216,207,162,.06);border-radius:4px}.room-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#roomsCard{grid-column:1/-1}
 .my-bdg{display:block;font-size:15px;margin:4px 0 0}
 .bdg{color:var(--signal);font-size:12px;font-weight:600;margin-left:6px;white-space:nowrap}
 .build{align-self:flex-end;margin-top:-6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--dim);opacity:.7}
@@ -257,12 +262,13 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
     <div class="mast">
       <h1>Ironfield</h1>
       <div class="bank">
-        <label class="callsign"><span class="tag">Callsign</span><input class="field" id="nameIn" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Callsign"></label><span class="bdg my-bdg" id="myBadge" hidden></span><span id="abBtns" class="ab-btns"></span>
+        <label class="callsign"><span class="tag">Callsign</span><input class="field" id="nameIn" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Callsign"></label><span class="bdg my-bdg" id="myBadge" hidden></span><span id="abBtns" class="ab-btns"></span><button class="btn ghost small" id="acctBtn" type="button">Sign in</button>
         <div><span class="tag" id="rpTag">Research points</span><b id="rpVal">0</b></div>
         <div><span class="tag">Best wave</span><b class="k" id="bestVal">–</b></div>
       </div>
     </div>
     <p class="lede">No health bars here. A shell has to get through the armour, then knock out the crew or set off the ammo. Earn RP and unlock tanks and planes from five nations.</p>
+    <section class="acct" id="acctBox" hidden aria-label="Account"></section>
     <section class="news live-bar" id="liveBar" hidden aria-label="News"></section>
     <section class="news" id="news" hidden aria-label="What's new">
       <div class="news-h"><span class="tag" id="newsTag">What's new</span><button class="btn ghost small" id="newsBtn" type="button">Show all</button></div>
@@ -280,9 +286,10 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
       <div class="mp-intro"><span class="tag">Co-op, up to 14 players</span><span class="why" id="coopRules">No nukes or admin tanks in co-op. Guests use the host's vehicles and earn their own RP. When a guest leaves, their leftover RP goes to the host.</span></div>
       <div class="conn"><i class="live" id="connDot"></i><span id="coopStatus">Not connected. Host a room or join a friend's.</span></div>
       <div class="mp-cards" id="coopIdle">
-        <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">You'll get a 6-character code. Send it to your friends. They can join any time, even mid-battle.</p><div class="row"><button class="btn small" id="hostBtn" type="button">Create room</button></div></div>
+        <div class="mp-card"><span class="tag">Host</span><h3>Open a room</h3><p class="why" style="margin:0">Everyone in the room plays on a copy of the save you pick. Only your own progress is kept.</p><div class="row"><select class="field" id="hostSave" aria-label="Save for this room"></select><button class="btn small" id="hostBtn" type="button">Create room</button></div><label class="setting"><input type="checkbox" id="pubRoom"> <span>Show my room in the open rooms list</span></label></div>
         <div class="mp-card"><span class="tag">Join</span><h3>Enter a room code</h3><div class="row"><input class="field" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code" enterkeyhint="go"><button class="btn small" id="joinBtn" type="button">Join</button></div><span class="why" id="joinHint">Codes are 6 letters and digits, like K7M2QX.</span></div>
       </div>
+      <div class="mp-card rooms" id="roomsCard"><span class="tag">Open rooms</span><div id="roomList" class="room-list"><p class="why">Looking for rooms…</p></div></div>
       <div id="coopOn" hidden>
         <div class="room-head">
           <div><span class="tag" id="roomTag">Room code</span><span class="code" id="roomCode"></span></div>
@@ -312,6 +319,7 @@ kbd{font-family:var(--mono);font-size:12px;padding:1px 6px;border:1px solid var(
     </div>
     <div class="foot">
       <label class="setting"><input type="checkbox" id="frBoom"> <span>French vehicles explode randomly (20% chance every 10 s) <span class="why" id="frNote"></span></span></label>
+      <label class="setting"><input type="checkbox" id="hullAim"> <span>Tank destroyers turn their hull toward your aim</span></label>
       <div class="row">
         <label class="setting"><span id="langLab">Language</span> <select class="field" id="langSel" style="width:auto;padding:4px 8px;font-size:14px"><option value="en">English</option><option value="tr">Türkçe</option></select></label>
         <button class="btn small" id="installBtn" type="button" hidden>Install on this device</button>
@@ -674,7 +682,7 @@ function modHP(t,type,side){let best=1;for(const c of t.comps)if(c.kind==='mod'&
 /* ---- flight ---- */
 /* turn-rate multiplier: fighters you fly turn about twice as hard as before (and keep more of it when slow);
    AI allies get some of that, enemy fighters a little, so you can out-turn them */
-function planeAgility(t){const f=t.T.cls==='fighter';if(t.team!=='p')return f?1.15:1;if(t.pai)return f?1.5:1.2;
+function planeAgility(t){const f=t.T.cls==='fighter';if(t.team!=='p')return f?1.15:1;if(t.pai)return f?1.7:1.2;
   return f?2.2*(1+.35*(1-clamp(t.v/t.T.spd,0,1))):1.2;}
 function updPlane(t,dt){
   const T=t.T;
@@ -766,7 +774,7 @@ function planeComp(t,x,y){const T=t.T;const w=[];for(const c of t.comps){if(c.ki
 /* a plane of ours parked on our runway (being serviced) can't be hurt and isn't a target */
 const onPad=t=>!!t&&t.air&&t.team==='p'&&!!t.landed;
 function planeHit(t,dmg,pe,by,kind){if(!t.alive||!t.air||t.T.immortal||onPad(t))return false;const T=t.T,rep=newReport(),n=kind==='flak'?2:1;if(kind==='flak1')kind='flak';
-  if(t.team==='p'&&!t.pai)dmg*=.75;else if(t.pai)dmg*=.85;t.hitT=time;
+  if(t.team==='p'&&!t.pai)dmg*=.75;else if(t.ally)dmg*=.55;else if(t.pai)dmg*=.85;t.hitT=time;
   for(let i=0;i<n;i++){const c=planeComp(t);if(!c)continue;let d=dmg*rand(.7,1.3);if(T.ar&&(c.role==='pilot'||c.type==='engine')&&pe<T.ar*1.2)d*=.25;hurt1(t,c,d,rep);}
   t.lastHitBy=by;if(by&&by.stats&&kind!=='flak')by.stats.hits++;
   const killed=planePost(t,rep,by);const sum=summary(rep);
@@ -1109,7 +1117,7 @@ const cleanBt=v=>typeof v==='string'&&/^[A-Z2-9]{10}\.[A-Z2-9]{12}$/.test(v)?v:'
 try{
   const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');
   if(raw&&Array.isArray(raw.slots)){store.active=clamp(Math.round(+raw.active||0),0,SLOTS-1);store.slots=[0,1,2].map(i=>raw.slots[i]?normSave(raw.slots[i]):null);
-    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
+    store.coop=raw.coop?normSave(raw.coop):null;store.name=cleanName(raw.name);store.lastCode=String(raw.lastCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);store.badge=cleanBt(raw.badge);store.dev=String(raw.dev||'').replace(/[^a-f0-9]/g,'').slice(0,24);store.frOff=raw.frOff?1:0;store.noHull=raw.noHull?1:0;store.pub=raw.pub===0?0:1;store.ban=String(raw.ban||'').slice(0,120);const ac=raw.acct;store.acct=ac&&typeof ac==='object'&&/^[a-f0-9]{64}$/.test(ac.tk)?{tk:ac.tk,id:String(ac.id||'').replace(/[^A-Z2-9]/g,'').slice(0,12),name:cleanName(ac.name),rev:Math.round(+ac.rev||0),dirty:ac.dirty?1:0}:null;store.abOff=Array.isArray(raw.abOff)?raw.abOff.filter(x=>['nuke','admin','kick','vote'].includes(x)):[];if(raw.allOff&&!store.abOff.includes('admin'))store.abOff.push('admin');}
   else{/* first run of this version: the old single save becomes slot 1 */
     let s=JSON.parse(localStorage.getItem('ironfield-save-v3')||'null');
     if(!s){const old=JSON.parse(localStorage.getItem('ironfield-save-v2')||'null');
@@ -1121,16 +1129,18 @@ if(!store.slots[store.active])store.slots[store.active]=freshSave();
 if(!store.coop)store.coop=freshSave();
 if(!store.name)store.name='Tanker-'+(100+Math.floor(Math.random()*900));
 if(!store.frOff){store.frOff=1;for(const sl of store.slots)if(sl)sl.frBoom=false;}
+if(store.pub===undefined)store.pub=1;
 if(!store.dev)store.dev=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
 let save=store.slots[store.active];
-function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(store));}catch(e){}}
+function persist(){if(store.acct&&!cloud.quiet){store.acct.dirty=1;cloudDirty();}try{localStorage.setItem(STORE_KEY,JSON.stringify(store));}catch(e){}}
+const cloud={quiet:false,timer:0,busy:false};
 persist();
 let hangarMode='solo';
 const coopProfile=()=>hangarMode==='mp'||net.mode!=='off';
 /* which profile is live: your current save slot, or, while you are a guest in a room, your room profile (kept by the
    host and never written to your own storage): your own RP, starting at 0, plus the host's vehicles and the ones you research.
-   When a guest leaves, the RP they have left goes into the host's save. */
-function useProfile(){const p=net.mode==='guest'?(net.room||(net.room=freshSave())):(store.slots[store.active]||(store.slots[store.active]=freshSave()));
+   Guests start from a copy of the host's save; only the host's own progress is kept. */
+function useProfile(){const p=net.mode==='guest'?(net.room||(net.room=freshSave())):net.mode==='host'&&net.temp?net.temp:(store.slots[store.active]||(store.slots[store.active]=freshSave()));
   if(p!==save){save=p;fixSel();viewId=save.sel;}}
 /* PERK: what redeemed codes unlocked. It lives only in memory, so it lasts until the page is reloaded or closed. */
 const PERK={all:false};
@@ -1320,7 +1330,7 @@ function convoyUpd(k,dt){if(!obj||obj.k!=='escort'){k.sp=0;return;}
 function convoyHurt(k,d,by){if(k.dead||(by&&by.team==='p'))return;k.hp-=d;if(k.hp<=0){k.hp=0;truckDie(k,by);if(obj&&obj.k==='escort'&&!obj.st)sayAll(trucks.some(q=>q.cv&&!q.dead)?'A convoy truck is lost':'The convoy is destroyed. Objective failed','#ee5d50');}}
 function objUpd(dt){if(!obj||net.mode==='guest'||phase!=='combat')return;if(obj.st)return;
   const inR=(t)=>t.alive&&!t.air&&Math.hypot(t.x-obj.x,t.y-obj.y)<obj.r;
-  if(obj.k==='hold'){const us=humans().filter(inR).length+tanks.filter(t=>t.ally&&inR(t)).length,them=tanks.filter(t=>t.team==='e'&&inR(t)).length;obj.cn=them?1:0;
+  if(obj.k==='hold'){const inA=t=>t.alive&&Math.hypot(t.x-obj.x,t.y-obj.y)<obj.r+(t.air?60:0),us=humans().filter(inA).length+tanks.filter(t=>t.ally&&inA(t)).length,them=tanks.filter(t=>t.team==='e'&&inR(t)).length;obj.cn=them?1:0;
     if(us&&!them){obj.p+=dt*Math.min(1.6,1+.2*(us-1));if(obj.p>=obj.need)objWin(1);}}
   else if(obj.k==='defend'){const them=tanks.filter(t=>t.team==='e'&&inR(t)).length;obj.cn=them?1:0;obj.p+=dt*Math.min(3,them);if(obj.p>=obj.need){obj.st=2;sayAll('The enemy has taken the village. Objective failed','#ee5d50');}}
   else{const cv=trucks.filter(q=>q.cv&&!q.dead);if(!cv.length){obj.st=2;return;}const ld=cv.reduce((a,b)=>(b.u-a.u)*b.dir>0?b:a);obj.x=ld.x;obj.y=ld.y;obj.p=Math.abs(ld.u-obj.u0);obj.cn=0;
@@ -1342,9 +1352,15 @@ function drawObj(hw,hh){if(!obj)return;const col=obj.st===1?'139,214,110':obj.st
 function objLabel(){if(!obj)return '';const f=Math.round(objFrac()*100);if(obj.st===1)return OBJN[obj.k]+' · DONE';if(obj.st===2)return OBJN[obj.k]+' · FAILED';
   if(obj.k==='hold')return OBJN.hold+' · '+f+'%'+(obj.cn?' · CONTESTED':'');if(obj.k==='defend')return OBJN.defend+' · '+(100-f)+'% SAFE'+(obj.cn?' · ENEMY INSIDE':'');
   const n=trucks.filter(q=>q.cv&&!q.dead).length;return OBJN.escort+' · '+f+'% · '+n+(n===1?' TRUCK':' TRUCKS')+(obj.cn?' · UNDER FIRE':'');}
-function objHUD(L,y,compact){if(!obj||phase!=='combat'&&obj.st)return;const txt=objLabel();if(!txt)return;ctx.save();ctx.font='600 '+(compact?10:12)+'px "IBM Plex Mono",monospace';const w=ctx.measureText(txt).width+14,x=L===null?VW/2-w/2:L;
-  ctx.fillStyle='rgba(16,19,13,.75)';ctx.fillRect(x,y,w,compact?17:20);ctx.fillStyle=obj.st===1?'#8bd66e':obj.st===2||obj.cn?'#ee5d50':'#ebd257';ctx.textAlign='left';ctx.fillText(txt,x+7,y+(compact?12:14.5));
-  const p=viewer()||player;if(p&&!obj.st){const[sx,sy]=W2S(obj.x,obj.y);if(sx<0||sx>VW||sy<0||sy>VH){const a=Math.atan2(sy-VH/2,sx-VW/2),m=Math.min((VW/2-36)/Math.abs(Math.cos(a)||1e-6),(VH/2-36)/Math.abs(Math.sin(a)||1e-6)),ex=VW/2+Math.cos(a)*m,ey=VH/2+Math.sin(a)*m;
+let waveEv=-99;const WXT={rain:'RAIN · enemies spot you later',fog:'FOG · enemies only spot you up close',night:'NIGHT · firing gives your position away'};
+/* the top-middle event strip: what this wave's weather and objective are, in plain words */
+let evH=0;
+function objHUD(L,y,compact){const rows=[];evH=0;if(phase==='combat'&&WXT[weather])rows.push([WXT[weather],'#8ab4d8']);
+  if(obj&&!(phase!=='combat'&&obj.st)){const t=objLabel();if(t)rows.push(['OBJECTIVE · '+t,obj.st===1?'#8bd66e':obj.st===2||obj.cn?'#ee5d50':'#ebd257']);}
+  if(!rows.length)return;ctx.save();const fresh=time-waveEv<5&&Math.sin(time*7)>0,fs=compact?10:12,h=compact?18:22;ctx.font='700 '+fs+'px "IBM Plex Mono",monospace';ctx.textAlign='center';
+  for(const[t0,c]of rows){const t=fitText(t0,VW-24),w=ctx.measureText(t).width+20;ctx.fillStyle=fresh?'rgba(60,50,20,.9)':'rgba(16,19,13,.82)';ctx.fillRect(VW/2-w/2,y,w,h);ctx.strokeStyle=c;ctx.globalAlpha=.7;ctx.lineWidth=1;ctx.strokeRect(VW/2-w/2+.5,y+.5,w-1,h-1);ctx.globalAlpha=1;
+    ctx.fillStyle=c;ctx.fillText(t,VW/2,y+h-(compact?5:6.5));y+=h+4;evH+=h+4;}
+  const p=viewer()||player;if(obj&&!obj.st&&p){const[sx,sy]=W2S(obj.x,obj.y);if(sx<0||sx>VW||sy<0||sy>VH){const a=Math.atan2(sy-VH/2,sx-VW/2),m=Math.min((VW/2-36)/Math.abs(Math.cos(a)||1e-6),(VH/2-36)/Math.abs(Math.sin(a)||1e-6)),ex=VW/2+Math.cos(a)*m,ey=VH/2+Math.sin(a)*m;
     ctx.translate(ex,ey);ctx.rotate(a);ctx.fillStyle='rgba(235,210,87,.95)';ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);ctx.closePath();ctx.fill();}}ctx.restore();}
 function drawRailTraffic(hw,hh){
   for(const k of trucks){if(Math.abs(k.x-cam.x)>hw+40||Math.abs(k.y-cam.y)>hh+40)continue;ctx.save();ctx.translate(k.x,k.y);ctx.rotate(k.a);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(-15,-6,32,15);
@@ -1753,7 +1769,7 @@ function kill(t,by,cause){
     t.deathCause=why;if(t===player)deathCause=why;}
 }
 function explosion(x,y,f,owner,opts={}){
-  if(bridges.length)bridgeBlast(x,y,f,owner);if(train||trucks.length)vehicleBlast(x,y,f,owner);const rs=opts.rs||1,Rx=2.2*Math.cbrt(f)*rs,opPen=1.6*Math.cbrt(f),R2=Rx*1.3;
+  if(bridges.length)bridgeBlast(x,y,f,owner);if(train||trucks.length)vehicleBlast(x,y,f,owner);if(f>=1500&&net.mode!=='guest'){const Rw=2.2*Math.cbrt(f)+30;for(const t of tanks)if(!t.alive&&!t.air&&t.fade===undefined&&!isHuman(t)&&Math.hypot(t.x-x,t.y-y)<Rw+t.T.R)wreckGone(t,true);}const rs=opts.rs||1,Rx=2.2*Math.cbrt(f)*rs,opPen=1.6*Math.cbrt(f),R2=Rx*1.3;
   fx(rs!==1?{k:'boom',x:r1(x),y:r1(y),f:Math.round(f),rs:r2(rs)}:{k:'boom',x:r1(x),y:r1(y),f:Math.round(f)});
   const hitList=[];
   for(const t of tanks){if(!t.alive||t.air)continue;const T=t.T,l=local(t,x,y),dx=Math.max(0,Math.abs(l[0])-T.L/2),dy=Math.max(0,Math.abs(l[1])-T.W/2),d=t===opts.direct?0:Math.hypot(dx,dy);if(d>=Rx)continue;
@@ -1901,7 +1917,8 @@ function allyAI(t,dt){const T=t.T,A=t.ai,lead=humans().find(h=>h.alive&&!h.air)|
   if(t.canFire&&t.reload<=0&&t.rounds>0){const m=muzzle(t);if(Math.abs(norm(m.ga-t.aimAt))<.06)fire(t,d);}}
 /* when the enemy brings aircraft and nobody in the squad flies or drives anti-air, the airfield sends help */
 function spawnAllies(nP){const lead=humans().find(h=>h.alive)||player;if(!lead)return;const nat=lead.T.nation,tier=Math.min(5,lead.T.tier),near=(a,b)=>Math.abs(a.tier-tier)-Math.abs(b.tier-tier);
-  const fi=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&T.nation===nat&&!T.admin).sort(near)[0];if(fi)spawnPlane(fi,'p');
+  const up=(a,b)=>Math.abs(a.tier-Math.min(5,tier+1))-Math.abs(b.tier-Math.min(5,tier+1))||b.tier-a.tier,fs=ROSTER.filter(T=>T.air&&T.cls==='fighter'&&T.nation===nat&&!T.admin).sort(up),fi=fs[0];
+  if(fi){const n=Math.min(3,1+Math.floor(nP/3));for(let i=0;i<n;i++)spawnPlane(fs[Math.min(i,fs.length-1)],'p');sayAll('AI '+fi.name+(n>1?' ×'+n:'')+' scrambled to cover the squad','#8bd66e');}
   if(nP>=3||!fi){const aa=ROSTER.filter(T=>T.aa&&!T.air&&T.nation===nat).sort(near)[0]||ROSTER.filter(T=>T.aa&&!T.air).sort(near)[0];
     if(aa){const sp=freeSpotNear(lead.x,lead.y),t=makeTank(aa,sp.x,sp.y,'e');t.team='p';t.ally=true;t.a=lead.a;t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});sayAll('AI '+aa.name+' joins the squad to cover you from the air','#8bd66e');}}}
 /* AA vehicles pick aircraft first and fire over cover with lead */
@@ -1974,6 +1991,7 @@ function spawnPoint(){
 function startWave(n){
   wave=n;phase='combat';votes.clear();closePick();clearWrecks(true);
   weather=pickWeather(n);objPick(n);if(weather!=='clear')sayAll({rain:'Rain moves in: enemies spot you a little later',fog:'Fog rolls in: enemies only spot you up close',night:'Night falls: stay in the dark. Firing gives your position away'}[weather],'#8ab4d8');
+  waveEv=time;
   if(isMilestone(n)){runCp=Math.max(runCp,n);if(n>(save.checkpoint||0)){save.checkpoint=n;persist();}sayAll('Checkpoint: wave '+n+'. If you are wiped out you can continue from here.','#8bd66e');netEv({k:'cp',w:n});}
   const P=playerCount(),base=1+Math.floor((n-1)*.6),count=Math.min(Math.round(base*(1+.6*(P-1)))+(P>1?Math.floor(n/4):0),9+4*(P-1),44);
   const arty=n>=4&&Math.random()<.35;
@@ -1984,7 +2002,7 @@ function startWave(n){
   for(let i=0;i<nAA;i++)spawnQueue.push({T:pickAA(n),at:time+1+i*2});
   for(let i=0;i<nP;i++)spawnQueue.push({T:pickPlane(n),at:time+8+i*rand(3,7),air:1});
   if(nP>0&&!humans().some(h=>h.alive&&(h.air||h.T.aa))&&!tanks.some(t=>t.ally&&t.alive))spawnAllies(nP);
-  setBanner({text:'WAVE '+n,sub:count+(count===1?' enemy vehicle inbound':' enemy vehicles inbound')+(arty?' · artillery spotted':'')+(nP?' · '+nP+(nP>1?' aircraft':' aircraft'):'')+(nAA?' · anti-air':''),t:3});
+  setBanner({text:'WAVE '+n+(WXL[weather]?' · '+WXL[weather]:''),sub:count+(count===1?' enemy vehicle inbound':' enemy vehicles inbound')+(arty?' · artillery spotted':'')+(nP?' · '+nP+(nP>1?' aircraft':' aircraft'):'')+(nAA?' · anti-air':'')+(obj?' · OBJECTIVE: '+OBJN[obj.k]:''),t:4});
 }
 function spawnEnemy(T){const sp=spawnPoint(),t=makeTank(T,sp.x,sp.y,'e'),h=humans().find(q=>q.alive)||player;if(obj&&!obj.st&&t.ai&&!T.aa&&Math.random()<.5)t.ai.ob=1;t.a=Math.atan2(h.y-sp.y,h.x-sp.x);t.aimAt=t.a;tanks.push(t);fx({k:'spawn',x:r1(sp.x),y:r1(sp.y)});}
 function resupply(p){for(const c of p.comps){if(c.kind==='crew'){c.alive=true;c.hp=c.max;}else c.hp=c.max;}
@@ -1994,8 +2012,11 @@ function resupply(p){for(const c of p.comps){if(c.kind==='crew'){c.alive=true;c.
 /* wrecks and the smoke over them fade out once a wave is won, so the next wave isn't fought through old hulks */
 function clearWrecks(now){let n=0;for(const t of tanks.slice()){if(t.alive||isHuman(t))continue;if(now){tanks.splice(tanks.indexOf(t),1);n++;}else if(t.fade===undefined){t.fade=0;t.burn=0;}}
   if(n)navDirty=true;fx({k:'clean'});}
+/* wrecks break up when shot enough or caught in a big blast, and fade by themselves 10 s after the kill */
+function wreckGone(t,boom){if(t.fade!==undefined)return;t.fade=0;t.burn=0;navDirty=true;if(boom)fx({k:'boom',x:r1(t.x),y:r1(t.y),f:1500});}
 function trimSmoke(){for(const p of parts)if(!p.glow&&p.grow>=8)p.life=Math.min(p.life,.7);}
 function waveCleared(){
+  liveStat();
   objEnd();const lead=humans().reduce((a,b)=>b.T.tier>a.T.tier?b:a),pt=Math.min(5,lead.T.tier),rp=Math.round((100+50*wave)*[1,1.25,1.5,1.8,2.2][pt-1]*rpMul());
   for(const h of humans())rpFor(h,rp);
   if(wave>save.best){save.best=wave;persist();}
@@ -2230,9 +2251,9 @@ function localInput(){
   const[wx,wy]=mouseWorld();const clicked=!!mouse.click||fireTap;mouse.click=false;fireTap=false;let trig=mouse.down||clicked||!!keys[' ']||fireHeld;
   if(menuOpen||pickOpen){thr=0;st=0;trig=false;}
   const fresh=trig&&(!wasTrig||clicked);wasTrig=mouse.down||!!keys[' ']||fireHeld;if(fresh)net.clicks++;
-  if(tapSel){const t=tapSel;tapSel=null;if(!fresh)net.clicks++;return{thr,st,ax:t[0],ay:t[1],trig,fresh:true,tap:true,pr:artyPickR()};}
-  if(pAx)return{thr,st,ax:pAx[0],ay:pAx[1],trig,fresh,pr:artyPickR()};
-  return{thr,st,ax:wx,ay:wy,trig,fresh,pr:artyPickR()};
+  if(tapSel){const t=tapSel;tapSel=null;if(!fresh)net.clicks++;return{thr,st,ax:t[0],ay:t[1],trig,fresh:true,tap:true,pr:artyPickR(),nh:!!store.noHull};}
+  if(pAx)return{thr,st,ax:pAx[0],ay:pAx[1],trig,fresh,pr:artyPickR(),nh:!!store.noHull};
+  return{thr,st,ax:wx,ay:wy,trig,fresh,pr:artyPickR(),nh:!!store.noHull};
 }
 function controlTank(p,inp,dt){
   if(!p||!p.alive)return;if(p.air){controlPlane(p,inp,dt);return;}const T=p.T;let st=inp.st;
@@ -2247,7 +2268,7 @@ function controlTank(p,inp,dt){
   p.aimAt=tg?Math.atan2(tg.y-m0.py,tg.x-m0.px):Math.atan2(inp.ay-m0.py,inp.ax-m0.px);p.aimAir=false;
   if(T.aa){/* lead the aircraft nearest the cursor; radar sets lock on by themselves */let best=null,bd=T.radar?320:150;for(const o of tanks){if(!o.air||!o.alive||o.team===p.team)continue;const d=Math.hypot(o.x-inp.ax,o.y-inp.ay);if(d<bd){bd=d;best=o;}}
     if(best){const d=Math.hypot(best.x-m0.mx,best.y-m0.my),lt=d/T.shellV;p.aimAt=Math.atan2(best.y+best.vy*lt-m0.py,best.x+best.vx*lt-m0.px);p.aimAir=true;p.aaLock=best;}else p.aaLock=null;}
-  if(T.td&&st===0&&p.canDrive&&(!T.arty||(inp.thr===0&&Math.abs(p.v)<T.spd*.12))){const e=norm(p.aimAt-T.base-p.a);if(Math.abs(e)>T.arcR*.85)st=clamp(e*2.2,-1,1);}
+  if(T.td&&!inp.nh&&st===0&&p.canDrive&&(!T.arty||(inp.thr===0&&Math.abs(p.v)<T.spd*.12))){const e=norm(p.aimAt-T.base-p.a);if(Math.abs(e)>T.arcR*.85)st=clamp(e*2.2,-1,1);}
   p.throttle=inp.thr;p.steer=st;
   if(inp.fresh)p.trigT=.35;else p.trigT-=dt;
   if(!inp.trig||p.reload>0||!p.canFire||picked)return;
@@ -2269,7 +2290,7 @@ function playerInput(dt){
     if(t.air)t.parked=!!pe.input.mn&&phase==='break';
     const pick=pe.lastPicks!==undefined&&i.pk!==pe.lastPicks;pe.lastPicks=i.pk;
     if(pick&&t.T.arty){const e=enemyNear(i.px,i.py,170);if(e){if(artyTargetOf(t)===e){t.artyTarget=null;say(t,'Target released','#8e8a6b');}else{t.artyTarget=e;say(t,'Locked on the '+e.T.name,'#ebd257');}}}
-    controlTank(t,{thr:clamp(+i.thr||0,-1,1),st:clamp(+i.st||0,-1,1),ax:+i.ax||t.x,ay:+i.ay||t.y,trig:!!i.trig&&!pick,fresh:fresh&&!pick,pr:170},dt);}
+    controlTank(t,{thr:clamp(+i.thr||0,-1,1),st:clamp(+i.st||0,-1,1),ax:+i.ax||t.x,ay:+i.ay||t.y,trig:!!i.trig&&!pick,fresh:fresh&&!pick,pr:170,nh:!!i.nh},dt);}
 }
 /* ================= flow & hangar ================= */
 {const v=(document.querySelector('meta[name="ironfield-version"]')||{}).content;$('#buildTag').textContent='Build '+(v||'dev');}
@@ -2379,18 +2400,24 @@ function apiNext(){const n=(codeApis||[]).length;if(n>1)apiWorked((apiIdx+1)%n);
 async function codeCall(path,body){const L=await codeAPIs();if(!L.length)return{ok:false,reason:'setup'};
   for(let i=0;i<4;i++){const k=(apiIdx+i)%L.length;try{const r=await fetch(L[k]+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});const j=await r.json();apiWorked(k);return j;}
     catch(e){if(i<3)await new Promise(f=>setTimeout(f,[300,900,2000][i]));}}
+  if(net.mode==='guest'&&net.connected&&RELAY.includes(path))return relayCall(path,body);
   return{ok:false,reason:'net'};}
+/* a guest whose internet can't reach the server (some networks block it) asks the host to pass the request on */
+const RELAY=['/redeem','/badge','/verify','/bchk'];
+function relayCall(path,body){body=Object.assign({},body);delete body.tk;const id=net.rq=(net.rq||0)+1;netSend({e:'api',id,p:path,b:body});
+  return new Promise(res=>{const W=net.rqW||(net.rqW=new Map());const t=setTimeout(()=>{W.delete(id);res({ok:false,reason:'net'});},15000);W.set(id,r=>{clearTimeout(t);W.delete(id);res(r&&typeof r==='object'?r:{ok:false,reason:'net'});});});}
 const cleanTk=k=>k&&typeof k==='object'?{id:String(k.id||'').replace(/[^A-Z0-9]/g,'').slice(0,6),flags:String(k.flags||'').replace(/[^A-Z]/g,'').slice(0,1),t:Math.round(num(k.t,0,1e14)),nonce:String(k.nonce||'').replace(/[^a-z0-9]/gi,'').slice(0,40),ticket:String(k.ticket||'').replace(/[^0-9a-f]/g,'').slice(0,64)}:null;
 async function redeem(){const msg=$('#rdmMsg'),c=$('#rdmIn').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==15){msg.textContent='Not valid';return;}msg.textContent='…';
-  const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name});
+  const nonce=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join(''),r=await codeCall('/redeem',{code:c,nonce,dev:store.dev,name:store.name,tk:store.acct?store.acct.tk:undefined});
   if(!r||!r.ok){msg.textContent={used:'Already used',off:'Switched off',expired:'This code has expired',mine:'You already used this code',setup:'Codes are not set up yet',net:'Can\'t reach the code service'}[r&&r.reason]||'Not valid';return;}
-  const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],slot=()=>store.slots[store.active]||(store.slots[store.active]=freshSave());
+  const done=[],perks=Array.isArray(r.perks)?r.perks.slice(0,8):[],slot=()=>net.mode==='host'?save:store.slots[store.active]||(store.slots[store.active]=freshSave()),inRoom=net.mode==='guest'&&net.connected,where=()=>inRoom?' (this room and slot '+(store.active+1)+')':net.mode==='host'&&net.temp?' (this session)':' in slot '+(store.active+1);
+  if(inRoom&&perks.some(k=>/^(rp|veh):/.test(k)))netSend({e:'perk',tk:cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket})});
   for(const k of perks){if(typeof k!=='string')continue;
     if(k==='all_vehicles'){PERK.all=true;net.perkTk=cleanTk({id:r.id,flags:r.flags,t:r.t,nonce,ticket:r.ticket});if(net.mode==='guest'&&net.connected)netSend({e:'perk',tk:net.perkTk});done.push('Every vehicle until you close the game');}
     /* RP and vehicle codes go into your own save slot for good (as a guest you see them after leaving the room) */
-    else if(/^rp:\d{1,7}$/.test(k)){const n=clamp(+k.slice(3),1,1e6);slot().rp+=n;persist();done.push('+'+fmt(n)+' RP in slot '+(store.active+1));}
-    else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){const sl=slot();if(!sl.owned.includes(T.id))sl.owned.push(T.id);if(!sl.earned.includes(T.id))sl.earned.push(T.id);persist();done.push(T.name+' unlocked in slot '+(store.active+1));}else done.push('That vehicle is not in this version of the game');}
-    else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;const bn=cleanName(r.name);if(bn){store.name=bn;if(nameIn)nameIn.value=bn;}persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,ao:(store.abOff||[]).join(',')});
+    else if(/^rp:\d{1,7}$/.test(k)){const n=clamp(+k.slice(3),1,1e6);slot().rp+=n;persist();done.push('+'+fmt(n)+' RP'+where());}
+    else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){const sl=slot();if(!sl.owned.includes(T.id))sl.owned.push(T.id);if(!sl.earned.includes(T.id))sl.earned.push(T.id);persist();done.push(T.name+' unlocked'+where());}else done.push('That vehicle is not in this version of the game');}
+    else if(k==='badge'&&cleanBt(r.badge)){store.badge=r.badge;const bn=cleanName(r.name);if(bn){store.name=bn;if(nameIn)nameIn.value=bn;}persist();BADGE.delete(r.badge);checkBadges([r.badge]);if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,ao:(store.abOff||[]).join(',')});
       done.push(r.again?'Your '+(cleanName(r.label)||'Creator')+' badge and the callsign '+store.name+' are back on this device':(cleanName(r.label)||'Creator')+' badge for '+store.name+': shown next to that callsign in co-op. Keep this code: it brings the badge back on any device.');}}
   $('#rdmIn').value='';$('#rdmBox').hidden=true;msg.textContent=done.join(' · ')||'Done';fixSel();renderHangar();coopUI();if(net.mode==='host')sendLobby(true);}
 /* live settings from the server (news, RP events, maintenance, oldest build allowed), refreshed every 5 minutes */
@@ -2429,8 +2456,8 @@ function liveNote(rows){const el=$('#liveNote');if(!el)return;el.textContent='';
 let liveWs=null,liveTry=0,livePing=0;
 async function liveConnect(){const api=await codeAPI();if(!api||!('WebSocket' in window)||(liveWs&&liveWs.readyState<2))return;
   let ws;try{ws=new WebSocket(api.replace(/^https:/,'wss:')+'/live');}catch(e){liveRetry();return;}liveWs=ws;
-  ws.onopen=()=>{liveTry=0;ws.opened=1;ws.seen=Date.now();clearInterval(livePing);livePing=setInterval(()=>{if(Date.now()-ws.seen>100000){try{ws.close();}catch(e){}return;}try{ws.send('ping');}catch(e){}},45000);};
-  ws.onmessage=e=>{ws.seen=Date.now();if(typeof e.data!=='string'||e.data.length>6000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(d&&d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);};
+  ws.onopen=()=>{liveTry=0;ws.opened=1;ws.seen=Date.now();setTimeout(()=>liveHi(true),50);clearInterval(livePing);livePing=setInterval(()=>{if(Date.now()-ws.seen>100000){try{ws.close();}catch(e){}return;}try{ws.send('ping');}catch(e){}},45000);};
+  ws.onmessage=e=>{ws.seen=Date.now();if(typeof e.data!=='string'||e.data.length>60000||e.data==='pong')return;let d;try{d=JSON.parse(e.data);}catch(x){return;}if(!d||typeof d!=='object')return;if(d.e==='cfg'&&d.cfg&&typeof d.cfg==='object')applyLive(d.cfg,true);else liveMsg(d);};
   ws.onclose=()=>{clearInterval(livePing);if(liveWs===ws)liveWs=null;if(!ws.opened)apiNext();liveRetry();};}
 function liveRetry(){liveTry++;setTimeout(()=>{if(!document.hidden)liveConnect();},Math.min(60000,2000*2**Math.min(liveTry,5))+Math.random()*2000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!liveWs)liveConnect();});
@@ -2466,12 +2493,88 @@ function badgeTkOf(name){if(!name)return '';const k=nkey(name);
   if(net.mode==='guest'){const r=net.squad.find(r=>nkey(r[0])===k);return r&&r[4]||'';}
   if(k===nkey(store.name))return store.badge;const pe=net.mode==='host'?peerList().find(p=>nkey(p.name)===k):null;return pe&&pe.btOk||'';}
 function badgeFor(name){const tk=badgeTkOf(name),v=tk&&BADGE.get(tk);return v&&v.l&&v.n===nkey(name)?v.l:'';}
+/* ================= accounts and cloud saves =================
+   Signed in, your three save slots live on the server (any device, survives clearing the browser). The server checks
+   each upload: RP that grows faster than anyone can earn is cut back and the corrected save comes back here. */
+const ACCT_ERR={name:'Callsigns need at least 3 letters or digits',pw:'Passwords need 6 to 64 characters',taken:'That callsign already has an account',locked:'That callsign belongs to a badge holder. Enter your badge code first (Multiplayer → code)',
+  wrong:'Wrong callsign or password',slow:'Too many tries. Wait 15 minutes',ban:'This account or device is banned',signin:'Signed out: sign in again',net:'Can\'t reach the server',setup:'Can\'t reach the server'};
+const acctCall=(op,x)=>codeCall('/acct',Object.assign({op,dev:store.dev},x||{}));
+function cloudSlots(){return{active:store.active,slots:store.slots.map(x=>x?{rp:x.rp,owned:x.owned,earned:x.earned,sel:x.sel,best:x.best,nation:x.nation,frBoom:x.frBoom,checkpoint:x.checkpoint,startAt:x.startAt}:null)};}
+function adoptCloud(sv,rev){if(!sv||!Array.isArray(sv.slots))return;cloud.quiet=true;try{
+    store.slots=[0,1,2].map(i=>sv.slots[i]?normSave(sv.slots[i]):null);store.active=clamp(Math.round(+sv.active||0),0,SLOTS-1);if(!store.slots[store.active])store.slots[store.active]=freshSave();
+    store.acct.rev=rev;store.acct.dirty=0;useProfile();save=net.mode==='guest'?save:(net.temp||store.slots[store.active]);persist();}finally{cloud.quiet=false;}
+  if(state==='hangar')renderHangar();}
+function cloudDirty(){clearTimeout(cloud.timer);cloud.timer=setTimeout(cloudPush,8000);}
+async function cloudPush(){const a=store.acct;if(!a||cloud.busy)return;if(!a.dirty)return;cloud.busy=true;
+  try{const r=await acctCall('save',{tk:a.tk,rev:a.rev,save:cloudSlots()});if(store.acct!==a)return;
+    if(r&&r.ok){a.rev=r.rev;a.dirty=0;if(r.fixed&&r.save){adoptCloud(r.save,r.rev);toast('The server corrected your RP: it grew faster than anyone can earn');}else{cloud.quiet=true;persist();cloud.quiet=false;}}
+    else if(r&&r.reason==='old'&&r.save){adoptCloud(r.save,r.rev);toast('Loaded your newer cloud save from another device');}
+    else if(r&&(r.reason==='signin'||r.reason==='ban')){store.acct=null;persist();toast(ACCT_ERR[r.reason]);renderAcct();}
+    else cloudDirty();}
+  finally{cloud.busy=false;}renderAcct();}
+async function acctLoad(){const a=store.acct;if(!a)return;const r=await acctCall('load',{tk:a.tk});if(store.acct!==a)return;
+  if(r&&r.ok){if(r.name)a.name=r.name;if(r.bt&&!store.badge){store.badge=r.bt;checkBadges([r.bt]);}
+    if(r.save&&r.rev>a.rev)adoptCloud(r.save,r.rev);else if(a.dirty||!r.save)cloudPush();acctName();}
+  else if(r&&(r.reason==='signin'||r.reason==='ban')){store.acct=null;persist();toast(ACCT_ERR[r.reason]);}renderAcct();}
+function acctName(){const a=store.acct;if(!a||!a.name)return;const mine=store.badge&&BADGE.get(store.badge);if(mine&&mine.nm)return;if(store.name!==a.name){store.name=a.name;nameIn.value=a.name;persist();if(net.connected)netSend({e:'name',name:store.name});renderSquad();}nameIn.readOnly=true;nameIn.title='Your callsign is your account name';}
+async function acctGo(reg){const m=$('#acMsg'),name=cleanName($('#acName').value),pw=$('#acPw').value;m.textContent='…';
+  const r=await acctCall(reg?'reg':'login',{name,pw,bt:store.badge});if(!r||!r.ok){m.textContent=ACCT_ERR[r&&r.reason]||'Something went wrong';return;}
+  store.acct={tk:r.tk,id:r.id,name:r.name,rev:r.rev||0,dirty:0};
+  if(r.bt&&!store.badge){store.badge=r.bt;BADGE.delete(r.bt);checkBadges([r.bt]);}else if(store.badge&&!r.bt)acctCall('bt',{tk:r.tk,bt:store.badge});
+  if(r.save){try{localStorage.setItem(STORE_KEY+'-local',JSON.stringify(store.slots));}catch(e){}adoptCloud(r.save,r.rev);toast('Signed in as '+r.name+': your cloud save is loaded');}
+  else{store.acct.dirty=1;persist();cloudPush();toast(reg?'Account made: this device\'s saves are now in the cloud':'Signed in as '+r.name);}
+  acctName();liveHi(true);renderAcct();}
+function renderAcct(){const btn=$('#acctBtn'),box=$('#acctBox');if(!btn||!box)return;const a=store.acct;btn.textContent=a?'☁ '+(a.dirty?'Saving…':'Saved'):'Sign in';
+  if(box.hidden)return;box.textContent='';const el=(tag,props)=>Object.assign(document.createElement(tag),props||{});
+  if(a){const p=el('p');p.append('Signed in as ',el('b',{textContent:a.name}),' · your 3 save slots are kept on the server'+(a.dirty?' (saving…)':''));
+    const out=el('button',{type:'button',className:'btn ghost small',textContent:'Sign out'});out.onclick=()=>{acctCall('out',{tk:a.tk});store.acct=null;nameIn.readOnly=false;nameIn.title='';persist();liveHi(true);renderAcct();toast('Signed out. Your saves stay on this device too');};
+    box.append(p,out);return;}
+  box.append(el('p',{className:'why',textContent:'An account keeps your RP and research on the server: play on any device and never lose them.'}),
+    el('input',{className:'field',id:'acName',maxLength:16,placeholder:'Callsign',autocomplete:'username',value:store.name}),
+    el('input',{className:'field',id:'acPw',type:'password',maxLength:64,placeholder:'Password',autocomplete:'current-password'}));
+  const go=el('button',{type:'button',className:'btn small',textContent:'Sign in'}),mk=el('button',{type:'button',className:'btn ghost small',textContent:'Create account'});go.onclick=()=>acctGo(false);mk.onclick=()=>acctGo(true);
+  box.append(go,mk,el('span',{className:'why',id:'acMsg'}));$('#acPw').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();acctGo(false);}});}
+$('#acctBtn').addEventListener('click',()=>{const b=$('#acctBox');b.hidden=!b.hidden;renderAcct();});
+addEventListener('pagehide',()=>{if(store.acct&&store.acct.dirty){clearTimeout(cloud.timer);cloudPush();}});
+/* ================= open rooms =================
+   Hosts who leave "show my room" on check in with the server every 20 s; the multiplayer tab lists them. */
+let roomsT=0,roomBeat=0;
+async function roomsPoll(){clearTimeout(roomsT);if(hangarMode!=='mp'||net.mode!=='off'||state!=='hangar'||document.hidden){roomsT=setTimeout(roomsPoll,4000);return;}
+  const L=await codeAPIs();let r=null;for(let i=0;i<L.length&&!r;i++){const k=(apiIdx+i)%L.length;try{const x=await fetch(L[k]+'/rooms',{cache:'no-store'});r=x.ok?await x.json():null;}catch(e){}}
+  renderRooms(r&&Array.isArray(r.rooms)?r.rooms:null);roomsT=setTimeout(roomsPoll,8000);}
+function renderRooms(list){const box=$('#roomList');if(!box)return;box.textContent='';const el=(tag,props)=>Object.assign(document.createElement(tag),props||{});
+  if(!list){box.append(el('p',{className:'why',textContent:'Can\'t reach the room list. Joining by code still works.'}));return;}
+  const ok=list.filter(r=>r&&r.v===PROTO&&/^[A-Z0-9]{6}$/.test(r.code));if(!ok.length){box.append(el('p',{className:'why',textContent:'No open rooms right now. Create one!'}));return;}
+  for(const r of ok.slice(0,30)){const row=el('div',{className:'room-row'}),full=r.n>=r.max;row.append(el('b',{textContent:cleanName(r.name)||'Room'}),el('span',{className:'why',textContent:Math.round(num(r.n,1,14))+'/'+Math.round(num(r.max,2,14))+(r.st?' · wave '+Math.round(num(r.wave,0,1e4)):' · in hangar')+(r.lock?' · locked':'')}));
+    const j=el('button',{type:'button',className:'btn small',textContent:'Join',disabled:full||!!r.lock});j.onclick=()=>{$('#joinCode').value=r.code;joinCoop(r.code);};row.append(j);box.append(row);}}
+async function roomUp(down){if(net.mode!=='host'||!net.code)return;if(!net.roomK)net.roomK=[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  if(down||!store.pub){if(net.listed){net.listed=false;codeCall('/room',{op:'down',code:net.code,k:net.roomK});}return;}
+  const mine=store.badge&&BADGE.get(store.badge);net.listed=true;codeCall('/room',{op:'up',code:net.code,k:net.roomK,name:store.name,n:humansCount(),max:MAX_PLAYERS,lock:net.locked?1:0,wave,st:state==='hangar'?0:1,v:PROTO,dev:store.dev,bg:mine&&mine.l||''});}
+const humansCount=()=>1+peerList().length;
+setInterval(()=>{if(net.mode==='host')roomUp();},20000);
+{const pb=$('#pubRoom');pb.checked=!!store.pub;pb.addEventListener('change',()=>{store.pub=pb.checked?1:0;persist();roomUp();});}
+/* ================= live player link =================
+   The game tells the server who is playing (for the owner's panel) and reports cleared waves for the daily stats;
+   the server can send a message, a kick, a ban or "your save changed" back. */
+let hiKey='';
+function liveHi(force){if(!liveWs||liveWs.readyState!==1)return;const a=store.acct,m={e:'hi',dev:store.dev,name:store.name,bt:store.badge||'',acct:a?a.id:'',an:a?a.name:'',room:net.code||'',mode:net.mode,st:state,wave:state==='hangar'?0:wave,veh:save.sel,ver:+((document.querySelector('meta[name="ironfield-version"]')||{}).content||0)||0};
+  const k=JSON.stringify(m);if(!force&&k===hiKey)return;hiKey=k;try{liveWs.send(k);}catch(e){}}
+setInterval(()=>liveHi(false),5000);
+function liveStat(){if(liveWs&&liveWs.readyState===1&&player)try{liveWs.send(JSON.stringify({e:'stat',w:wave,v:player.T.id}));}catch(e){}}
+function liveMsg(d){
+  if(d.e==='msg'){const t=liveTxt(d.text,300);if(t){liveNote([['Message'+(d.from?' from '+liveTxt(d.from,16):''),t]]);toast(t);}return true;}
+  if(d.e==='kick'){if(net.mode!=='off')leaveCoop();liveNote([['Removed',liveTxt(d.text,200)||'The admin removed you from multiplayer']]);return true;}
+  if(d.e==='ban'){store.ban=liveTxt(d.text,120)||'banned';persist();if(net.mode!=='off')leaveCoop();coopUI();return true;}
+  if(d.e==='unban'){store.ban='';persist();coopUI();return true;}
+  if(d.e==='save'){if(store.acct){store.acct.rev=-1;acctLoad();toast('Your save was updated by the admin');}return true;}
+  return false;}
 $('#rdmBtn').addEventListener('click',()=>{const b=$('#rdmBox');b.hidden=!b.hidden;if(!b.hidden)$('#rdmIn').focus();});
 $('#rdmGo').addEventListener('click',redeem);$('#rdmIn').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();redeem();}});
 /* browsers that support it offer "Install": the site then opens full screen from a home-screen icon, like an app */
 let installEv=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;$('#installBtn').hidden=false;});
 $('#installBtn').addEventListener('click',async()=>{if(!installEv)return;installEv.prompt();try{await installEv.userChoice;}catch(e){}installEv=null;$('#installBtn').hidden=true;});
 window.addEventListener('appinstalled',()=>{$('#installBtn').hidden=true;toast('Installed: open Ironfield from your home screen');});
+{const hb=$('#hullAim');hb.checked=!store.noHull;hb.addEventListener('change',()=>{store.noHull=hb.checked?0:1;persist();});}
 const frBox=$('#frBoom');frBox.addEventListener('change',()=>{if(net.mode==='guest'){renderFrNote();return;}save.frBoom=frBox.checked;persist();if(net.mode==='host')sendLobby();});
 let resetArm=0;
 $('#resetBtn').addEventListener('click',e=>{const b=e.currentTarget;
@@ -2503,14 +2606,13 @@ function doResearch(T){if(!applyResearch(T))return;if(state==='hangar')save.sel=
 function guestProfile(pe){return{rp:pe.rp||0,owned:[...new Set(save.owned.filter(id=>TYPE[id]&&!TYPE[id].admin).concat(STARTERS,[...(pe.mine||[])]))],earned:[]};}
 function guestResearch(pe,T){const P=guestProfile(pe),host=save,pk=PERK.all;save=P;PERK.all=false;abOff=true;let ok=false;try{ok=applyResearch(T);}finally{save=host;PERK.all=pk;abOff=false;}
   if(ok){pe.rp=P.rp;(pe.mine||(pe.mine=new Set())).add(T.id);}return ok;}
-/* a leaving guest's leftover RP goes into the host's save; their research is remembered by name for a rejoin */
+/* guests play on a copy of the host's save that is thrown away when they leave (kept by name for a rejoin) */
 /* a guest who drops is held for 2 minutes: if they come back under the same name they keep their RP, research and
-   battle stats; otherwise their RP goes to the host's save as usual */
+   battle stats */
 function holdGuest(pe){if(!pe.name)return;const k=pe.name.toLowerCase(),A=net.away||(net.away={});if(A[k])clearTimeout(A[k].timer);
   A[k]={name:pe.name,rp:pe.rp||0,mine:pe.mine,stats:pe.stats,timer:setTimeout(()=>{if(net.away&&net.away[k]){bankGuest(net.away[k]);delete net.away[k];}},120000)};pe.rp=0;}
 function bankAway(){for(const k in net.away||{}){clearTimeout(net.away[k].timer);bankGuest(net.away[k]);}net.away={};}
-function bankGuest(pe){if(!pe.name)return;(net.left||(net.left={}))[pe.name.toLowerCase()]=[...(pe.mine||[])];const n=Math.round(pe.rp||0);pe.rp=0;
-  if(n>0){save.rp+=n;persist();sysAll(pe.name+'\'s '+fmt(n)+' RP went to '+store.name+'\'s save');}}
+function bankGuest(pe){if(!pe.name)return;(net.left||(net.left={}))[pe.name.toLowerCase()]={mine:[...(pe.mine||[])],rp:Math.round(pe.rp||0)};pe.rp=0;}
 /* research against the real save (owned() also counts session perks, which must not make research free) */
 function applyResearch(T){if(!T||T.admin||save.owned.includes(T.id)||save.rp<T.cost)return false;const pre=prereq(T);if(pre&&!save.owned.includes(pre.id)&&!prereqMet(T))return false;
   save.rp-=T.cost;save.owned.push(T.id);if(!save.earned.includes(T.id))save.earned.push(T.id);return true;}
@@ -2524,7 +2626,7 @@ function renderHangar(){
     const box=$('#abBtns'),N={nuke:'Nukes',admin:'Every vehicle',kick:'Can\'t be kicked',vote:'Starts waves'};box.textContent='';
     for(const x of ['nuke','admin','kick','vote'])if(myAbAll().has(x)){const on=!(store.abOff||[]).includes(x),bt=document.createElement('button');bt.type='button';bt.className='btn small'+(on?'':' ghost');bt.textContent=N[x]+': '+(on?'ON':'OFF');
       bt.addEventListener('click',()=>{const L=store.abOff||(store.abOff=[]);if(on)L.push(x);else L.splice(L.indexOf(x),1);persist();
-        if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,ao:L.join(',')});fixSel();renderHangar();if(net.mode==='host')sendLobby(true);toast(N[x]+(on?' off':' on'));});box.append(bt);}}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
+        if(net.connected&&net.mode==='guest')netSend({e:'hello',v:PROTO,tank:net.myTank||save.sel,name:store.name,bt:store.badge,dev:store.dev,ao:L.join(',')});fixSel();renderHangar();if(net.mode==='host')sendLobby(true);toast(N[x]+(on?' off':' on'));});box.append(bt);}}$('#resetBtn').hidden=net.mode==='guest';renderFrNote();if(Date.now()-resetArm>=3400)$('#resetBtn').textContent='Reset slot '+(store.active+1);
   if(net.mode==='host'&&net.connected)sendLobby();
   $('#tabs').innerHTML=NATIONS.map(n=>'<button class="tab" type="button" role="tab" id="tab-'+n.id+'" data-n="'+n.id+'" aria-selected="'+(n.id===save.nation)+'">'+flagImg(n.id)+n.name+'</button>').join('');
   if(TYPE[viewId]&&(TYPE[viewId].air?'air':'ground')!==treeDom)treeDom=TYPE[viewId].air?'air':'ground';
@@ -2576,7 +2678,7 @@ function renderDetail(){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);
 }
@@ -2591,7 +2693,7 @@ function renderAirDetail(T,row,action){
   const b=$('#deployBtn');if(b)b.addEventListener('click',()=>{save.sel=T.id;persist();start();});
   const rj=$('#rejoinBtn');if(rj)rj.addEventListener('click',()=>{save.sel=T.id;persist();hostRejoin();});
   const ss=$('#startSel');if(ss)ss.addEventListener('change',()=>{save.startAt=+ss.value||1;persist();});
-  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
+  const rb=$('#readyBtn');if(rb)rb.addEventListener('click',()=>{save.sel=T.id;persist();net.myTank=T.id;netSend({e:'hello',v:PROTO,tank:T.id,name:store.name,bt:store.badge,dev:store.dev,ao:(store.abOff||[]).join(',')});renderHangar();coopUI();});
   const r=$('#researchBtn');if(r)r.addEventListener('click',()=>doResearch(T));
   drawPreview(T);}
 function drawPreview(T){const c=$('#preview');if(!c)return;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.fillStyle=T.air?'#33402c':'#2c3420';g.fillRect(0,0,c.width,c.height);
@@ -2615,7 +2717,7 @@ function update(dt){
   for(const t of tanks.slice()){if(t.air){if(t.alive&&t.pai)planeAI(t,dt);updPlane(t,dt);if(t.gone){tanks.splice(tanks.indexOf(t),1);continue;}
       if(t.fade!==undefined){t.fade+=dt;if(t.fade>1.6){tanks.splice(tanks.indexOf(t),1);continue;}}else if(t.debris>12&&!isHuman(t)){tanks.splice(tanks.indexOf(t),1);}continue;}
     if(t.alive){if(t.ally)allyAI(t,dt);else if(t.ai)aiUpdate(t,dt);if(t.alive)updTank(t,dt);}
-    else{cosmetic(t,dt,0,0);if(t.fade!==undefined){t.fade+=dt;if(t.fade>1.6){tanks.splice(tanks.indexOf(t),1);navDirty=true;continue;}}}
+    else{cosmetic(t,dt,0,0);if(t.fade===undefined&&!isHuman(t)&&time-(t.diedAt||time)>10)wreckGone(t,false);if(t.fade!==undefined){t.fade+=dt;if(t.fade>1.6){tanks.splice(tanks.indexOf(t),1);navDirty=true;continue;}}}
     if(t.turretFly&&t.turretFly.t<1.2){const f=t.turretFly;f.t+=dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.spin*dt;f.vx*=.97;f.vy*=.97;f.spin*=.97;}}
   for(let i=shells.length-1;i>=0;i--){const s=shells[i];
     if(s.kind==='arty'){s.t+=dt;steerArty(s,dt);const k=Math.min(1,s.t/s.tof);s.x=s.x0+(s.x1-s.x0)*k;s.y=s.y0+(s.y1-s.y0)*k;s.h=Math.max(0,s.v*Math.sin(s.th)*s.t-G*s.t*s.t/2);
@@ -2640,7 +2742,7 @@ function update(dt){
         s.vx*=.82;s.vy*=.82;s.penMul*=.85;treeHit.hp-=s.T.c;if(treeHit.hp<=0)fallTree(treeHit,Math.atan2(s.vy,s.vx));
         fx({k:'leaf',x:r1(s.x),y:r1(s.y)});}
       for(const t of tanks){if(t===s.owner||t.air||(s.owner&&s.owner.team==='p'&&t.team==='p'))continue;if(inTank(t,s.x,s.y)){dead=true;
-        if(t.alive)hitTank(t,s);else{if(am.he)explosion(s.x,s.y,s.T.f,s.owner);fx({k:'wreck',x:r1(s.x),y:r1(s.y)});setHint(s.owner,{text:'HIT WRECK',color:'#8e8a6b',sub:'',t:1.2});}
+        if(t.alive)hitTank(t,s);else{if(am.he)explosion(s.x,s.y,s.T.f,s.owner);fx({k:'wreck',x:r1(s.x),y:r1(s.y)});t.wh=(t.wh||0)+(s.T.c||50)+(am.he?80:0);const gone=t.wh>=140&&!isHuman(t);if(gone)wreckGone(t,true);setHint(s.owner,{text:gone?'WRECK DESTROYED':'HIT WRECK',color:'#8e8a6b',sub:'',t:1.2});}
         break;}}}
     if(dead){const j=shells.indexOf(s);if(j>=0)shells.splice(j,1);}}
   for(let i=strikes.length-1;i>=0;i--){const q=strikes[i];q.t-=dt;if(q.target&&q.target.alive){q.x=q.target.x;q.y=q.target.y;}if(q.t<=-1.5)strikes.splice(i,1);}
@@ -3028,7 +3130,10 @@ function hud(){lockHUD();terrainHUD();
   const m=compact?8:12,L=m+SAFE.l,R=VW-m-SAFE.r,top=m+SAFE.t,bot=VH-m-SAFE.b;
   if(hurt>0){const g=ctx.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.3,VW/2,VH/2,Math.max(VW,VH)*.7);g.addColorStop(0,'rgba(180,30,20,0)');g.addColorStop(1,'rgba(180,30,20,'+(.45*hurt)+')');ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);}
   /* status panel */
-  const pr0=p.air?drawPlaneHud(p,L,top,compact&&!hudExpanded,touch):compact&&!hudExpanded?drawMini(p,L,top,touch):drawFull(p,L,top,touch);
+  /* dead: the panel shows the teammate you're watching, and switches back when you respawn */
+  const vw=!p.alive?viewer():null,q=vw&&vw!==p&&vw.alive&&Array.isArray(vw.comps)&&vw.comps.length?vw:p;
+  const pr0=q.air?drawPlaneHud(q,L,top,compact&&!hudExpanded,touch):compact&&!hudExpanded?drawMini(q,L,top,touch):drawFull(q,L,top,touch);
+  if(q!==p){const lab='SPECTATING '+(nameOf(q)||'TEAMMATE').toUpperCase();ctx.font='600 10px "IBM Plex Mono",monospace';ctx.textAlign='left';const w=ctx.measureText(lab).width+12;ctx.fillStyle='rgba(16,19,13,.8)';ctx.fillRect(L,top+pr0.h+2,w,16);ctx.fillStyle='#8bd66e';ctx.fillText(lab,L+6,top+pr0.h+13);}
   hudPanelRect=compact?[L,top,pr0.w,pr0.h]:null;
   if(p.alive&&p.air&&p.oob>0){const left=Math.max(0,30-p.oob),blink=left<10&&Math.sin(time*8)>0;ctx.textAlign='center';ctx.fillStyle='rgba(16,19,13,.78)';const bw=Math.min(VW-24,420);ctx.fillRect(VW/2-bw/2,VH*.22-30,bw,58);
     ctx.fillStyle=blink?'#ffffff':'#ee5d50';ctx.font=(compact?'700 18px':'700 24px')+' "Saira Condensed",sans-serif';ctx.fillText(fitText('RETURN TO THE BATTLEFIELD · '+Math.ceil(left)+' S',bw-20),VW/2,VH*.22);
@@ -3052,10 +3157,10 @@ function hud(){lockHUD();terrainHUD();
   if(!compact&&VW>=1000){const w=470;ctx.fillStyle='rgba(16,19,13,.75)';ctx.fillRect(VW/2-w/2,top,w,42);ctx.textAlign='left';ctx.fillStyle='#d8cfa2';ctx.font='19px "Saira Stencil One",Impact,sans-serif';ctx.fillText('WAVE '+wave,VW/2-w/2+12,top+28);
     ctx.font='600 12px "IBM Plex Mono",monospace';ctx.fillStyle=phase==='break'?'#8bd66e':'#ee5d50';ctx.fillText(wtxt,VW/2-w/2+104,top+26);ctx.textAlign='right';ctx.fillStyle='#f2a23a';ctx.fillText(fmt(save.rp)+' RP',VW/2+w/2-12,top+19);ctx.font='600 10px "IBM Plex Mono",monospace';ctx.fillStyle=rpFlash>0?'#8bd66e':'#8e8a6b';ctx.fillText('+'+fmt(battleRP)+' THIS BATTLE',VW/2+w/2-12,top+34);
     if(ping){ctx.textAlign='center';ctx.font='600 10px "IBM Plex Mono",monospace';ctx.fillStyle=net.connected||net.mode==='host'?'#8e8a6b':'#ee5d50';ctx.fillText('CO-OP · '+ping,VW/2,top+56);}objHUD(null,top+(ping?62:48),false);}
-  else{const y0=top+pr0.h+6,txt='W'+wave+' · '+wtxt,rp=fmt(save.rp)+' RP (+'+fmt(battleRP)+')';ctx.font='600 10px "IBM Plex Mono",monospace';ctx.textAlign='left';
+  else{const y0=top+pr0.h+6+(q!==p?18:0),txt='W'+wave+' · '+wtxt,rp=fmt(save.rp)+' RP (+'+fmt(battleRP)+')';ctx.font='600 10px "IBM Plex Mono",monospace';ctx.textAlign='left';
     const w=Math.max(ctx.measureText(txt).width,ctx.measureText(rp).width,ping?ctx.measureText(ping).width:0)+12,h=ping?43:30;
     ctx.fillStyle='rgba(16,19,13,.7)';ctx.fillRect(L,y0,w,h);ctx.fillStyle=phase==='break'?'#8bd66e':'#d8cfa2';ctx.fillText(txt,L+6,y0+12);ctx.fillStyle=rpFlash>0?'#8bd66e':'#f2a23a';ctx.fillText(rp,L+6,y0+25);
-    if(ping){ctx.fillStyle=net.connected||net.mode==='host'?'#8e8a6b':'#ee5d50';ctx.fillText(ping,L+6,y0+38);}objHUD(L,y0+h+4,true);}
+    if(ping){ctx.fillStyle=net.connected||net.mode==='host'?'#8e8a6b':'#ee5d50';ctx.fillText(ping,L+6,y0+38);}objHUD(null,y0+h+6,true);}
   /* kill feed */
   ctx.textAlign='left';
   const land=VW>VH;
@@ -3127,7 +3232,7 @@ function hud(){lockHUD();terrainHUD();
     ctx.lineWidth=compact?4:6;ctx.strokeStyle='rgba(10,12,8,.8)';const bt=fitText(banner.text,VW-24);ctx.strokeText(bt,VW/2,by);ctx.fillStyle='#f2a23a';ctx.fillText(bt,VW/2,by);
     ctx.font=compact?'600 10px "IBM Plex Mono",monospace':'600 13px "IBM Plex Mono",monospace';ctx.lineWidth=4;const bs=fitText(banner.sub.toUpperCase(),VW-24);ctx.strokeText(bs,VW/2,by+(compact?18:28));ctx.fillStyle='#d8cfa2';ctx.fillText(bs,VW/2,by+(compact?18:28));ctx.globalAlpha=1;}
   if(!p.alive){/* a compact spectator bar near the top: who you are watching, and how to switch */
-    const mate=viewer(),L=specList(),bw=Math.min(VW-24,compact?320:420),bx=VW/2-bw/2,byy=compact?top+pr0.h+(touch?56:52):top+(VW>=1000?66:pr0.h+52),bh=mate&&mate!==p?50:26;
+    const mate=viewer(),L=specList(),bw=Math.min(VW-24,compact?320:420),bx=VW/2-bw/2,byy=(compact?top+pr0.h+(touch?56:52)+(q!==p?18:0):top+(VW>=1000?66:pr0.h+52))+evH,bh=mate&&mate!==p?50:26;
     ctx.fillStyle='rgba(16,19,13,.82)';ctx.fillRect(bx,byy,bw,bh);ctx.strokeStyle='rgba(238,93,80,.6)';ctx.lineWidth=1;ctx.strokeRect(bx+.5,byy+.5,bw-1,bh-1);ctx.textAlign='center';
     ctx.font='600 '+(compact?10:11)+'px "IBM Plex Mono",monospace';ctx.fillStyle='#ee5d50';ctx.fillText(fitText(L.length?'DESTROYED · YOU RESPAWN WHEN THE WAVE IS CLEARED':'DESTROYED',bw-16),VW/2,byy+16);
     if(mate&&mate!==p){ctx.fillStyle='#d8cfa2';ctx.font='600 '+(compact?11:13)+'px "IBM Plex Mono",monospace';ctx.fillText(fitText('WATCHING '+nameOf(mate).toUpperCase()+' · '+mate.T.name.toUpperCase()+(L.length>1?'  ('+(specIdx+1)+'/'+L.length+')':''),bw-60),VW/2,byy+33);
@@ -3138,7 +3243,7 @@ function hud(){lockHUD();terrainHUD();
    Star layout: the host's browser runs the whole battle for up to 14 players. Every guest sends inputs and
    actions (~30 Hz) and draws snapshots plus a stream of effect events. PeerJS only brokers the first handshake;
    game traffic then flows browser to browser over WebRTC. Everything that arrives is parsed and clamped before use. */
-const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=6;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
+const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=7;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
 /* the PeerJS library comes from one of three CDNs, whichever loads first in turn */
 const PEER_SRC=['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js','https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js'];
@@ -3182,11 +3287,17 @@ function squadCount(){return net.mode==='host'?1+peerList().length:net.mode==='g
 function coopStatus(text,err){const el=$('#coopStatus');el.textContent=text;el.classList.toggle('err',!!err);const d=$('#connDot');d.className='live'+(err?' err':net.connected?' ok':net.mode!=='off'?' wait':'');}
 function sendLobby(force){if(net.mode!=='host')return;const list=peerList(),seen=new Set([store.badge]);for(const pe of list){pe.btOk=pe.bt&&!seen.has(pe.bt)?pe.bt:'';if(pe.btOk)seen.add(pe.bt);}
   const sq=[[store.name,save.sel,0,state==='hangar'?0:1,store.badge]].concat(list.map(pe=>[pe.name||'Guest',pe.tank||'m4a1',1,pe.t?1:0,pe.btOk]));
-  const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
+  const bl={};for(const r of sq){const v=r[4]&&BADGE.get(r[4]);if(v&&typeof v==='object')bl[r[4]]={l:v.l,n:v.nm,ab:[...v.ab]};}
+  const base={e:'lobby',v:PROTO,st:state==='hangar'?0:1,fr:save.frBoom?1:0,sq,bl},pfs=list.map(pe=>{const g=guestProfile(pe);return{rp:g.rp,best:save.best,owned:g.owned,cp:save.checkpoint||0};}),
     k=JSON.stringify([base,pfs]);if(!force&&k===net.lobbyKey)return;net.lobbyKey=k;
   list.forEach((pe,i)=>sendTo(pe,Object.assign({},base,{me:i+1,pf:pfs[i]})));}
+function fillHostSave(){const el=$('#hostSave');if(!el||net.mode!=='off')return;const was=el.value;el.textContent='';
+  for(let i=0;i<SLOTS;i++){const sv=store.slots[i];if(!sv)continue;const o=document.createElement('option');o.value=String(i);o.textContent='Slot '+(i+1)+' · '+fmt(sv.rp)+' RP · '+sv.owned.length+' vehicles';el.append(o);}
+  const f=document.createElement('option');f.value='fresh';f.textContent='Fresh start'+(store.slots.some(x=>!x)?'':' (this session only)');el.append(f);
+  el.value=was&&[...el.options].some(o=>o.value===was)?was:String(store.active);}
 function coopUI(light){
-  const idle=net.mode==='off';$('#coopIdle').hidden=!idle;$('#coopOn').hidden=idle;if(idle&&!MP_OK)coopStatus(MP_NO,true);
+  fillHostSave();
+  const idle=net.mode==='off';$('#coopIdle').hidden=!idle;$('#roomsCard').hidden=!idle;$('#coopOn').hidden=idle;if(idle&&!MP_OK)coopStatus(MP_NO,true);
   $('#roomCode').textContent=net.code||'';$('#roomTag').textContent=net.mode==='host'?'Your room code · send it to your friends (up to '+(MAX_PLAYERS-1)+')':'Room code';
   $('#copyBtn').hidden=idle;$('#lockBtn').hidden=net.mode!=='host';$('#shareBtn').hidden=idle||!navigator.share;
   const live=$('#mpLive');live.className='live'+(net.connected?' ok':net.mode!=='off'?' wait':'');live.hidden=idle;
@@ -3248,13 +3359,17 @@ async function ensureFresh(){if(!MY_BUILD||!MP_OK)return true;const b=await late
 function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=document.createElement('div');bar.id='updBar';
   bar.style.cssText='position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--panel2);border:1px solid var(--signal);border-radius:4px;color:var(--khaki);font-family:var(--body);font-size:16px;max-width:calc(100vw - 32px)';
   const t=document.createElement('span');t.textContent='A new version of Ironfield is out.';const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='Reload';btn.onclick=()=>reloadNewest(b);bar.append(t,btn);document.body.append(bar);}
-let livePoll=Date.now();liveCfg().then(liveConnect);
+let livePoll=Date.now();liveCfg().then(()=>{liveConnect();if(store.acct){acctName();acctLoad();}});renderAcct();roomsPoll();
 setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>60000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},15000);checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
+  if(store.ban){coopStatus('This device is banned from multiplayer'+(store.ban!=='banned'?': '+store.ban:''),true);return;}
   /* the room shows up at once; the version check runs while the room opens (maintenance is already known from LIVE) */
   if(!MP_OK){coopStatus(MP_NO,true);return;}if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}
-  if(net.mode!=='off')return;Object.assign(net,{mode:'host',code:genCode(),connected:false,conn:null,chat:[],peers:new Map(),lobbyKey:''});hangarMode='mp';useProfile();net.remote={tank:null,name:'',st:0,fr:1};if(state==='hangar')renderHangar();coopUI();coopStatus('Opening the room…');
+  if(net.mode!=='off')return;const pick=($('#hostSave')||{}).value||String(store.active);net.temp=null;
+  if(pick==='fresh'){const i=store.slots.findIndex(x=>!x);if(i>=0){store.active=i;store.slots[i]=freshSave();persist();toast('Fresh start in slot '+(i+1));}else{net.temp=freshSave();toast('Fresh start: this session only (all 3 slots are in use)');}}
+  else{const i=clamp(+pick|0,0,SLOTS-1);store.active=i;if(!store.slots[i])store.slots[i]=freshSave();persist();}
+  Object.assign(net,{mode:'host',code:genCode(),connected:false,conn:null,chat:[],peers:new Map(),lobbyKey:''});hangarMode='mp';useProfile();net.remote={tank:null,name:'',st:0,fr:0};if(state==='hangar')renderHangar();coopUI();coopStatus('Opening the room…');
   if(!await ensureFresh())return;if(net.mode!=='host')return;
   try{await Transport.host(net.code,conn=>{
       if(net.locked){conn.on('open',()=>{rawSend(conn,JSON.stringify({e:'locked'}));setTimeout(()=>{try{conn.close();}catch(e){}},400);});return;}
@@ -3263,7 +3378,7 @@ async function hostCoop(){
       conn.on('open',()=>{if(peerList().length>=MAX_PLAYERS-1){rawSend(conn,JSON.stringify({e:'full'}));net.peers.delete(pe.pid);setTimeout(()=>{try{conn.close();}catch(e){}},400);return;}pe.open=true;pe.lastRx=performance.now();updConn();net.lobbyKey='';sendLobby(true);coopUI();});
       conn.on('data',d=>{pe.lastRx=performance.now();const m=parseMsg(d,8192);if(m)try{hostData(pe,m);}catch(err){}});
       const bye=()=>peerClosed(pe);conn.on('close',bye);conn.on('error',bye);},netError);
-    if(net.mode==='host'){coopUI();addChat(null,'Room '+net.code+' is open. Share the code (up to '+MAX_PLAYERS+' players).','sys');}}
+    if(net.mode==='host'){coopUI();roomUp();addChat(null,'Room '+net.code+' is open. Share the code (up to '+MAX_PLAYERS+' players).','sys');}}
   catch(err){netError(err);}
 }
 function peerClosed(pe){if(!net.peers.has(pe.pid))return;const was=pe.open;net.peers.delete(pe.pid);pe.open=false;try{pe.conn.close();}catch(e){}
@@ -3274,16 +3389,23 @@ function hostData(pe,d){
   if(!d.e)return;
   if(d.e==='ping'){sendTo(pe,{e:'pong',t:num(d.t,0,1e15)});return;}
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)pe.rtt=pe.rtt?pe.rtt*.6+r*.4:r;return;}
+  if(d.e==='api'){const id=Math.round(num(d.id,0,1e9)),path=String(d.p||'');if(!RELAY.includes(path)||!d.b||typeof d.b!=='object'||JSON.stringify(d.b).length>3000||!rateOk(pe.api||(pe.api=[]),60000,15)){sendTo(pe,{e:'apir',id,r:{ok:false,reason:'net'}});return;}
+    codeCall(path,d.b).then(r=>{if(net.peers.has(pe.pid))sendTo(pe,{e:'apir',id,r});});return;}
   if(d.e==='hello'){if(d.v!==PROTO){sendTo(pe,{e:'old'});setTimeout(()=>peerClosed(pe),300);return;}const n0=cleanName(d.name);if(n0&&net.banned&&net.banned.has(n0.toLowerCase())){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);return;}
     const first=!pe.name;const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;pe.tank=T&&(!T.admin||peAll(pe))?d.tank:'m4a1';pe.bt=cleanBt(d.bt);pe.abOff=new Set(String(d.ao||'').split(',').filter(x=>['nuke','admin','kick','vote'].includes(x)));checkBadges([pe.bt]);const n=hostName(pe,cleanName(d.name));pe.name=n||pe.name||'Guest '+pe.pid.slice(1);
-    if(first){const k=pe.name.toLowerCase(),back=net.away&&net.away[k];pe.rp=0;pe.mine=new Set(net.left&&net.left[k]||[]);
+    if(first&&d.dev){pe.dev=String(d.dev).replace(/[^a-f0-9]/g,'').slice(0,24);if(pe.dev)codeCall('/bchk',{devs:[pe.dev]}).then(r=>{if(r&&Array.isArray(r.bad)&&r.bad.includes(pe.dev)&&net.peers.has(pe.pid)){sendTo(pe,{e:'kicked'});setTimeout(()=>peerClosed(pe),300);}});}
+    if(first){const k=pe.name.toLowerCase(),back=net.away&&net.away[k],lf=net.left&&net.left[k];pe.rp=lf?lf.rp:save.rp;pe.mine=new Set(lf&&lf.mine||[]);
       if(back){clearTimeout(back.timer);delete net.away[k];pe.rp=back.rp;pe.mine=back.mine||pe.mine;pe.stats=back.stats||pe.stats;sysAll(pe.name+' reconnected');}else{sysAll(pe.name+' joined the room');toast(pe.name+' joined the room');}sfx.ping();}
     net.lobbyKey='';sendLobby(true);coopUI();if((state==='play'||state==='pause')&&!pe.t&&player)hotJoin(pe);return;}
-  if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,o:!!d.o,mn:!!d.mn};pe.touch=!!d.tc;return;}
+  if(d.e==='in'){pe.inputAt=performance.now();pe.input={thr:num(d.thr,-1,1),st:num(d.st,-1,1),ax:num(d.ax,-500,WW+500),ay:num(d.ay,-500,WH+500),trig:!!d.trig,c:num(d.c,0,1e9),pk:num(d.pk,0,1e9),px:num(d.px,-500,WW+500),py:num(d.py,-500,WH+500),ch:Math.round(num(d.ch,0,3)),hi:!!d.hi,nh:!!d.nh,o:!!d.o,mn:!!d.mn};pe.touch=!!d.tc;return;}
   if(d.e==='act'){if(!rateOk(pe.acts,1000,8))return;const t=pe.t;if(t&&t.alive&&state==='play'&&['ext','rep','arty','ord','land','gear','nuke'].includes(d.a))doAct(t,d.a,num(d.x,0,WW),num(d.y,0,WH));return;}
   if(d.e==='vote'){if(phase==='break'&&pe.t&&state==='play'){if(votes.has(pe.pid))votes.delete(pe.pid);else votes.add(pe.pid);}return;}
   if(d.e==='bench'){if(!rateOk(pe.acts,1000,8))return;if(state==='play'&&phase==='break'&&pe.t){dropPeerTank(pe,(pe.name||'A player')+' went back to the hangar');sendTo(pe,{e:'benched'});net.lobbyKey='';sendLobby();}else sendTo(pe,{e:'nobench'});return;}
-  if(d.e==='perk'){if(!rateOk(pe.acts,1000,8))return;const tk=cleanTk(d.tk);if(!tk)return;codeCall('/verify',tk).then(en=>{if(!en||!en.ok||!net.peers.has(pe.pid))return;if((en.perks||[]).includes('all_vehicles')){pe.perkAll=true;if(pe.wantTank&&tget(pe.wantTank)){pe.tank=pe.wantTank;pe.wantTank=null;}net.lobbyKey='';sendLobby(true);coopUI();}});return;}
+  if(d.e==='perk'){if(!rateOk(pe.acts,1000,8))return;const tk=cleanTk(d.tk);if(!tk)return;codeCall('/verify',tk).then(en=>{if(!en||!en.ok||!net.peers.has(pe.pid))return;if((en.perks||[]).includes('all_vehicles')){pe.perkAll=true;if(pe.wantTank&&tget(pe.wantTank)){pe.tank=pe.wantTank;pe.wantTank=null;}net.lobbyKey='';sendLobby(true);coopUI();}
+      /* RP and vehicle codes also count in the room, once per redemption */
+      const U=net.usedTk||(net.usedTk=new Set());if(U.has(tk.ticket))return;let ch=false;
+      for(const k of en.perks||[]){if(/^rp:\d{1,7}$/.test(k)){pe.rp=(pe.rp||0)+clamp(+k.slice(3),1,1e6);ch=true;}else if(/^veh:[a-z0-9_]{1,24}$/.test(k)){const T=tget(k.slice(4));if(T&&!T.admin){(pe.mine||(pe.mine=new Set())).add(T.id);ch=true;}}}
+      if(ch){U.add(tk.ticket);net.lobbyKey='';sendLobby(true);}});return;}
   if(d.e==='research'){if(!rateOk(pe.acts,1000,8))return;const T=tget(d.id);if(T)guestResearch(pe,T);net.lobbyKey='';sendLobby(true);return;}
   if(d.e==='swap'){const T=tget(d.tank);if(T&&T.admin&&!peAll(pe))pe.wantTank=d.tank;if(T&&(!T.admin||peAll(pe))){pe.tank=d.tank;if(pe.t)doSwap(pe.t,d.tank);net.lobbyKey='';sendLobby();}return;}
   if(d.e==='chat'){if(!rateOk(pe.chatIn,5000,6))return;const t=cleanText(d.text);if(!t)return;const who=pe.name||'Guest';addChat(who,t,'them');sfx.ping();
@@ -3322,24 +3444,25 @@ function sendSnapshot(){
 }
 /* ---- guest ---- */
 async function joinCoop(code){
+  if(store.ban){coopStatus('This device is banned from multiplayer'+(store.ban!=='banned'?': '+store.ban:''),true);return;}
   if(!MP_OK){coopStatus(MP_NO,true);return;}if(LIVE.maint.on){coopStatus(LIVE.maint.text||'Multiplayer is closed for maintenance. Try again soon.',true);return;}
   code=(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==6){coopStatus('Room codes have 6 characters.',true);return;}
-  if(net.mode!=='off')return;store.lastCode=code;persist();Object.assign(net,{mode:'guest',code,connected:false,conn:null,chat:[],squad:[],meIdx:-1,names:{}});net.remote={tank:null,name:'',st:0,fr:1};hangarMode='mp';useProfile();if(state==='hangar')renderHangar();coopUI();coopStatus('Looking for room '+code+'…');
+  if(net.mode!=='off')return;store.lastCode=code;persist();Object.assign(net,{mode:'guest',code,connected:false,conn:null,chat:[],squad:[],meIdx:-1,names:{}});net.remote={tank:null,name:'',st:0,fr:0};hangarMode='mp';useProfile();if(state==='hangar')renderHangar();coopUI();coopStatus('Looking for room '+code+'…');
   if(!await ensureFresh())return;if(net.mode!=='guest'||net.code!==code)return;
   try{const conn=await Transport.join(code,netError);attach(conn);
     setTimeout(()=>{if(net.mode==='guest'&&!net.connected&&net.code===code)netError({type:'timeout'});},15000);}
   catch(err){netError(err);}
 }
 function attach(conn){net.conn=conn;
-  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name,bt:store.badge,ao:(store.abOff||[]).join(',')});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
+  conn.on('open',()=>{net.connected=true;net.openAt=performance.now();net.lastRx=performance.now();net.rtt=0;net.myTank=save.sel;netSend({e:'hello',v:PROTO,tank:save.sel,name:store.name,bt:store.badge,dev:store.dev,ao:(store.abOff||[]).join(',')});if(net.perkTk)netSend({e:'perk',tk:net.perkTk});addChat(null,'Connected to room '+net.code,'sys');coopUI();});
   conn.on('data',d=>{net.lastRx=performance.now();try{guestRx(d);}catch(err){}});conn.on('close',onClose);conn.on('error',onClose);}
 function leaveCoop(){
+  if(net.mode==='host')roomUp(true);
   if(net.hostBenched){net.hostBenched=false;state='hangar';}
   const c=net.conn,p=net.peer;if(net.mode==='host'){bankAway();for(const pe of net.peers.values()){bankGuest(pe);try{pe.conn.close();}catch(e){}}}
-  Object.assign(net,{mode:'off',peer:null,conn:null,connected:false,code:'',chat:[],lobbyKey:'',peers:new Map(),squad:[],names:{},locked:false,banned:null,room:null});for(const b of[$('#lockBtn'),$('#lockBtn2')])b.textContent='Lock room';net.remote={tank:null,name:'',st:0,fr:1};net.myTank=null;useProfile();
+  Object.assign(net,{mode:'off',peer:null,conn:null,connected:false,code:'',chat:[],lobbyKey:'',peers:new Map(),squad:[],names:{},locked:false,banned:null,room:null,temp:null});for(const b of[$('#lockBtn'),$('#lockBtn2')])b.textContent='Lock room';net.remote={tank:null,name:'',st:0,fr:0};net.myTank=null;useProfile();
   try{if(c)c.close();}catch(e){}try{if(p)p.destroy();}catch(e){}if(state==='hangar')renderHangar();coopUI();
 }
-/* a host closing the page still pays its guests' leftover RP into its save */
 addEventListener('pagehide',()=>{if(net.mode==='host'){bankAway();for(const pe of net.peers.values())bankGuest(pe);}});
 function netError(err){
   const t=err&&err.type;
@@ -3363,12 +3486,16 @@ function guestData(d){
   if(!d.e)return;
   if(d.e==='ping'){netSend({e:'pong',t:num(d.t,0,1e15)});return;}
   if(d.e==='pong'){const r=performance.now()-num(d.t,0,1e15);if(r>=0&&r<10000)net.rtt=net.rtt?net.rtt*.6+r*.4:r;return;}
+  if(d.e==='apir'){const f=net.rqW&&net.rqW.get(Math.round(num(d.id,0,1e9)));if(f)f(d.r);return;}
   if(d.e==='lobby')rejoin.n=0;
   if(d.e==='lobby'&&d.v!==PROTO){leaveCoop();coopStatus('That room\'s host is running an old copy of the game. They need to play on the website: umvtt.github.io/ironfield',true);return;}
   if(d.e==='lobby'&&d.pf&&typeof d.pf==='object'){const f=d.pf,r=net.room||(net.room=freshSave());r.rp=Math.round(num(f.rp,0,1e9));r.best=Math.round(num(f.best,0,1e4));r.checkpoint=Math.round(num(f.cp,0,1e4));
     if(Array.isArray(f.owned)){r.owned=[...new Set(f.owned.slice(0,400).filter(id=>tget(id)&&!TYPE[id].admin).concat(STARTERS))];r.earned=r.owned.slice();}if(!owned(r.sel))r.sel='m4a1';
     if(state==='hangar'){useProfile();renderHangar();}if(pickOpen)renderPick();}
-  if(d.e==='lobby'){const sq=Array.isArray(d.sq)?d.sq.slice(0,MAX_PLAYERS):[];net.squad=sq.filter(Array.isArray).map(r=>[cleanName(r[0])||'Player',tget(r[1])?r[1]:null,r[2]?1:0,r[3]?1:0,cleanBt(r[4])]);checkBadges(net.squad.map(r=>r[4]));
+  if(d.e==='lobby'){const sq=Array.isArray(d.sq)?d.sq.slice(0,MAX_PLAYERS):[];net.squad=sq.filter(Array.isArray).map(r=>[cleanName(r[0])||'Player',tget(r[1])?r[1]:null,r[2]?1:0,r[3]?1:0,cleanBt(r[4])]);
+    /* the host already checked these badges with the server, so they show even when this device can't reach it */
+    if(d.bl&&typeof d.bl==='object')for(const r of net.squad){const v=r[4]&&d.bl[r[4]];if(v&&typeof v==='object'&&typeof BADGE.get(r[4])!=='object'||v&&BADGE.get(r[4])==='p')BADGE.set(r[4],{l:cleanName(v.l),nm:cleanName(v.n),n:nkey(v.n),ab:new Set((Array.isArray(v.ab)?v.ab:[]).filter(x=>['nuke','admin','kick','vote'].includes(x)))});}
+    checkBadges(net.squad.map(r=>r[4]));
     net.meIdx=Math.round(num(d.me,-1,MAX_PLAYERS));const h=net.squad[0];if(h){net.remote.name=h[0];net.remote.tank=h[1];}net.remote.st=d.st?1:0;net.remote.fr=d.fr?1:0;coopUI();return;}
   if(d.e==='chat'){const t=cleanText(d.text);if(!t)return;addChat(cleanName(d.from)||'Player',t,'them');sfx.ping();return;}
   if(d.e==='sys'){const t=cleanText(d.text);if(t)addChat(null,t,'sys');return;}
@@ -3444,7 +3571,7 @@ function guestUpdate(dt){
   /* a target pick must reach the host with the point that was clicked, even if it falls between two input packets;
      the guest mirrors the toggle locally so its own HUD shows the lock right away */
   if(inp.tap){net.picks=(net.picks||0)+1;net.pickPt=[r1(inp.ax),r1(inp.ay)];if(player&&player.alive&&player.T.arty){const e=enemyNear(inp.ax,inp.ay,artyPickR());if(e)player.artyTarget=artyTargetOf(player)===e?null:e;}}
-  if(net.inT<=0){const pp=net.pickPt||[0,0];net.inT=1/30;netSend({e:'in',tc:touchUI.hidden?0:1,mn:pickOpen?1:0,thr:r2(inp.thr),st:r2(inp.st),ax:r1(inp.ax),ay:r1(inp.ay),pk:net.picks||0,px:pp[0],py:pp[1],trig:inp.trig?1:0,c:net.clicks,ch:player?player.charge:0,hi:player&&player.high?1:0,o:inp.ord?1:0});}
+  if(net.inT<=0){const pp=net.pickPt||[0,0];net.inT=1/30;netSend({e:'in',tc:touchUI.hidden?0:1,mn:pickOpen?1:0,thr:r2(inp.thr),st:r2(inp.st),ax:r1(inp.ax),ay:r1(inp.ay),pk:net.picks||0,px:pp[0],py:pp[1],trig:inp.trig?1:0,c:net.clicks,ch:player?player.charge:0,hi:player&&player.high?1:0,o:inp.ord?1:0,nh:store.noHull?1:0});}
   if(player&&player.alive&&!player.air){const m0=muzzle(player);player.aimAt=Math.atan2(inp.ay-m0.py,inp.ax-m0.px);
     /* show your own shot at once (flash, sound, recoil); the host's copy of that muzzle flash is skipped when it arrives */
     const T=player.T,gap=Math.max(.35,(net.rtt||0)/1000*1.5+.1);
