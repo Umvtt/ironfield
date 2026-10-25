@@ -825,7 +825,8 @@ function updAirShells(s,dt){
   if(s.kind==='bullet'){const sx=s.vx*dt,sy=s.vy*dt,ax=s.x,ay=s.y;s.x+=sx;s.y+=sy;s.dist+=Math.hypot(sx,sy);
     if(shotVsPlanes(s,ax,ay,s.x,s.y))return true;
     if(s.ground&&s.dist>70&&!s.gunner){for(const t of tanks){if(t.air||!t.alive||(s.owner&&t.team===s.owner.team))continue;if(inTank(t,s.x,s.y,2))return strafeTank(t,s);}
-      const o=inObs(s.x,s.y);if(o&&o.kind==='fuel'){destroyObstacle(o,false,s.owner);return true;}}
+      const o=inObs(s.x,s.y);if(o&&o.kind==='fuel'){destroyObstacle(o,false,s.owner);return true;}
+      const vh=(train||trucks.length)&&vehicleAt(s.x,s.y);if(vh){vehicleHit(vh,s.g.d*3,s.owner);return true;}}
     if(s.dist>=s.maxD||s.x<0||s.y<0||s.x>WW||s.y>WH){if(s.ground&&!s.gunner&&Math.random()<.5)fx({k:'dust',x:r1(s.x),y:r1(s.y)});return true;}return false;}
   return false;}
 /* ---- player and network control ---- */
@@ -1188,7 +1189,7 @@ function genMap(seed){
   /* each side has an airfield: ours just south of the start, theirs far off in the north-east */
   const FW=900,FH=110;fields=[{team:'p',x:WW/2-FW/2,y:WH/2+560,w:FW,h:FH},{team:'e',x:Math.round(WW*.78-FW/2),y:Math.round(WH*.16),w:FW,h:FH}];
   const nearField=(x,y,w,h)=>fields.some(f=>x<f.x+f.w+160&&x+w>f.x-160&&y<f.y+f.h+120&&y+h>f.y-220);genTerrain(seed);
-  const wet=(x,y,w,h,pad)=>!!(inWater(x+w/2,y+h/2,Math.max(w,h)/2+pad)||bridges.some(b=>Math.hypot(b.x-x-w/2,b.y-y-h/2)<b.span+Math.max(w,h)));
+  const wet=(x,y,w,h,pad)=>Math.abs(y+h/2-railY(x+w/2))<h/2+60||!!(inWater(x+w/2,y+h/2,Math.max(w,h)/2+pad)||bridges.some(b=>Math.hypot(b.x-x-w/2,b.y-y-h/2)<b.span+Math.max(w,h)));
   while(obs.length<nObs&&tries<5000*A){tries++;
     const kind=r()<.62?'bldg':r()<.5?'rock':'wall';
     let w,h;if(kind==='wall'){if(r()<.5){w=130+r()*120;h=18;}else{w=18;h=130+r()*120;}}else{w=60+r()*130;h=60+r()*130;}
@@ -1222,7 +1223,7 @@ function genMap(seed){
   /* minefields behind warning signs: the mines are buried and only show up close */
   minefields=[];mines=[];for(let i=0,t2=0;i<Math.max(2,Math.round(A*.5))&&t2<400;t2++){const w=260+r()*120,h=200+r()*100,x=300+r()*(WW-600-w),y=300+r()*(WH-600-h);
     if(Math.hypot(x+w/2-WW/2,y+h/2-WH/2)<1400||!freeRect(x,y,w,h,30)||nearRoad(x+w/2,y+h/2,Math.max(w,h)*.5)||fields.some(f=>x<f.x+f.w+500&&x+w>f.x-500&&y<f.y+f.h+500&&y+h>f.y-500)||depots.some(d=>d.x>x-450&&d.x<x+w+450&&d.y>y-450&&d.y<y+h+450))continue;minefields.push({x,y,w,h});for(let k=0;k<11;k++)mines.push({x:x+20+r()*(w-40),y:y+20+r()*(h-40),i:mines.length,live:true});i++;}
-  const addTree=(x,y)=>{if(x<30||y<30||x>WW-30||y>WH-30)return;if(Math.hypot(x-WW/2,y-WH/2)<230)return;if(inObs(x,y,14)||inWater(x,y,18))return;
+  const addTree=(x,y)=>{if(x<30||y<30||x>WW-30||y>WH-30)return;if(Math.hypot(x-WW/2,y-WH/2)<230)return;if(inObs(x,y,14)||inWater(x,y,18)||Math.abs(y-railY(x))<40)return;
     if(fields.some(f=>x>f.x-60&&x<f.x+f.w+60&&y>f.y-60&&y<f.y+f.h+60)||depots.some(d=>Math.hypot(d.x-x,d.y-y)<110))return;
     const rr=8+r()*7;trees.push({x,y,r:rr,hp:rr*7,fallen:false,fa:0,tone:r(),i:trees.length});};
   for(let f=0;f<Math.round(9*A);f++){const cx=150+r()*(WW-300),cy=150+r()*(WH-300),R=120+r()*170,n=18+Math.floor(r()*26);for(let i=0;i<n;i++){const a=r()*TAU,d=Math.sqrt(r())*R;addTree(cx+Math.cos(a)*d,cy+Math.sin(a)*d);}}
@@ -1232,6 +1233,55 @@ function genMap(seed){
   buildNav();
 }
 
+
+/* ================= the railway and the road traffic =================
+   Every minute or two a train crosses on the railway: moving cover, and a target (the locomotive is worth RP, tank
+   wagons explode). Civilian trucks drive the roads; tanks crush them, and fuel trucks go up like a fuel dump.
+   The host simulates both; guests draw what the snapshot sends. */
+let rail=null,train=null,trainNext=40,trucks=[];
+const railY=x=>rail.base+Math.sin(x/1100+rail.ph)*70,railA=x=>Math.atan(Math.cos(x/1100+rail.ph)*70/1100);
+const CAR=96;
+function carPos(i){const x=train.x-train.dir*i*CAR;return{x,y:railY(x),a:railA(x)+(train.dir<0?Math.PI:0)};}
+function trainSpawn(){const dir=Math.random()<.5?1:-1,cars=[];for(let i=0;i<6;i++)cars.push({k:i===0?'loco':Math.random()<.35?'tank':'box',hp:i===0?900:500,dead:false});
+  train={dir,x:dir>0?-200:WW+200,sp:150,cars,stopped:false};sayAll('A train is crossing the map','#d8cfa2');}
+function trainUpd(dt){if(!rail||net.mode==='guest')return;if(!train){if(phase!=='break'){trainNext-=dt;if(trainNext<=0){trainNext=rand(70,110);trainSpawn();}}return;}
+  if(!train.stopped)train.x+=train.dir*train.sp*dt;const tail=train.x-train.dir*(train.cars.length-1)*CAR;
+  if((train.dir>0&&tail>WW+300)||(train.dir<0&&tail<-300)){train=null;return;}
+  /* a downed bridge: the train runs into the river */
+  for(let i=0;i<train.cars.length;i++){const c=train.cars[i];if(c.dead)continue;const p=carPos(i);if(p.x>0&&p.x<WW&&inWater(p.x,p.y,0)){trainCarDie(i,null);train.stopped=true;}}
+  for(const t of tanks){if(!t.alive||t.air||Math.abs(t.y-railY(t.x))>70)continue;for(let i=0;i<train.cars.length;i++){const p=carPos(i);if(Math.abs(p.x-t.x)>CAR)continue;
+    const poly=boxPoly(p.x,p.y,p.a,CAR*.47,17),m=sat(hullPoly(t),poly);if(!m)continue;
+    if(i===0&&!train.stopped&&!train.cars[0].dead&&!t.T.immortal){kill(t,null,'train');t.x+=m.x*m.d*2;t.y+=m.y*m.d*2;break;}t.x+=m.x*m.d;t.y+=m.y*m.d;}}}
+function boxPoly(x,y,a,hl,hw){const c=Math.cos(a),s=Math.sin(a);return[[x+c*hl-s*hw,y+s*hl+c*hw],[x+c*hl+s*hw,y+s*hl-c*hw],[x-c*hl+s*hw,y-s*hl-c*hw],[x-c*hl-s*hw,y-s*hl+c*hw]];}
+function trainCarDie(i,by){const c=train.cars[i];if(c.dead)return;c.dead=true;const p=carPos(i);fx({k:'boom',x:r1(p.x),y:r1(p.y),f:9000});
+  if(c.k==='tank'&&net.mode!=='guest')fuelQ.push({x:p.x,y:p.y,by,at:time+.15,f:16000});
+  if(c.k==='loco'){train.stopped=true;if(isHuman(by)){rpFor(by,Math.round(150*rpMul()));say(by,'Locomotive destroyed  +'+Math.round(150*rpMul())+' RP','#f2a23a');}}
+  else if(isHuman(by))rpFor(by,Math.round(30*rpMul()));}
+function truckPos(k){const rd=gFeat.roads[k.ri];let d=k.u;for(let i=1;i<rd.length;i++){const a=rd[i-1],b=rd[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]);if(d<=L||i===rd.length-1){const u=clamp(d/L,0,1);return{x:a[0]+(b[0]-a[0])*u,y:a[1]+(b[1]-a[1])*u,a:Math.atan2(b[1]-a[1],b[0]-a[0])+(k.dir<0?Math.PI:0)};}d-=L;}return{x:0,y:0,a:0};}
+const roadLen=rd=>{let L=0;for(let i=1;i<rd.length;i++)L+=Math.hypot(rd[i][0]-rd[i-1][0],rd[i][1]-rd[i-1][1]);return L;};
+function trucksReset(){trucks=[];if(!gFeat||net.mode==='guest')return;const n=3+Math.round(WW*WH/6e6/3);for(let i=0;i<n;i++){const ri=Math.floor(Math.random()*gFeat.roads.length),L=roadLen(gFeat.roads[ri]);
+  trucks.push({ri,u:Math.random()*L,L,dir:Math.random()<.5?1:-1,sp:rand(55,80),fuel:Math.random()<.35,dead:false,x:0,y:0,a:0});}}
+function trucksUpd(dt){if(net.mode==='guest')return;for(const k of trucks){if(k.dead)continue;let nu=k.u+k.dir*k.sp*dt;if(nu<0||nu>k.L){k.dir*=-1;nu=clamp(nu,0,k.L);}
+    const old=k.u;k.u=nu;let p=truckPos(k);if(inWater(p.x,p.y,4)||inObs(p.x,p.y,4)){k.u=old;k.dir*=-1;p=truckPos(k);}k.x=p.x;k.y=p.y;k.a=p.a;
+    for(const t of tanks){if(!t.alive||t.air)continue;if(Math.hypot(t.x-k.x,t.y-k.y)<t.T.R+14){truckDie(k,t);break;}}}}
+function truckDie(k,by){if(k.dead)return;k.dead=true;fx({k:'boom',x:r1(k.x),y:r1(k.y),f:k.fuel?6000:1500});if(k.fuel&&net.mode!=='guest')fuelQ.push({x:k.x,y:k.y,by,at:time+.1,f:12000});}
+/* a shell, bullet or blast that meets a train car or a truck */
+function vehicleAt(x,y){if(train)for(let i=0;i<train.cars.length;i++){const p=carPos(i);if(Math.abs(p.x-x)>CAR*.6||Math.abs(p.y-y)>40)continue;const c=Math.cos(-p.a),s=Math.sin(-p.a),lx=(x-p.x)*c-(y-p.y)*s,ly=(x-p.x)*s+(y-p.y)*c;if(Math.abs(lx)<CAR*.47&&Math.abs(ly)<17)return{car:i};}
+  for(const k of trucks)if(!k.dead&&Math.hypot(k.x-x,k.y-y)<16)return{truck:k};return null;}
+function vehicleHit(v,dmg,by){if(net.mode==='guest')return;if(v.truck)truckDie(v.truck,by);else{const c=train.cars[v.car];if(c.dead)return;c.hp-=dmg;if(c.hp<=0)trainCarDie(v.car,by);}}
+function vehicleBlast(x,y,f,by){if(net.mode==='guest')return;const R=2.2*Math.cbrt(f)+20;if(train)for(let i=0;i<train.cars.length;i++){const p=carPos(i);const d=Math.hypot(p.x-x,p.y-y);if(d<R+CAR*.4)vehicleHit({car:i},f/30*(1-d/(R+CAR*.4)),by);}
+  for(const k of trucks)if(!k.dead&&Math.hypot(k.x-x,k.y-y)<R)truckDie(k,by);}
+function drawRailTraffic(hw,hh){
+  for(const k of trucks){if(Math.abs(k.x-cam.x)>hw+40||Math.abs(k.y-cam.y)>hh+40)continue;ctx.save();ctx.translate(k.x,k.y);ctx.rotate(k.a);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(-15,-6,32,15);
+    if(k.dead){ctx.fillStyle='#2a2622';ctx.fillRect(-16,-8,32,16);}else{ctx.fillStyle=k.fuel?'#8a2f22':'#5a6340';ctx.fillRect(-16,-8,22,16);ctx.fillStyle='#3e4a2c';ctx.fillRect(6,-8,10,16);ctx.fillStyle='rgba(150,190,210,.7)';ctx.fillRect(12,-6,3,12);
+      if(k.fuel){ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(-14,-3,18,6);}}ctx.restore();}
+  if(!train)return;for(let i=0;i<train.cars.length;i++){const c=train.cars[i],p=carPos(i);if(Math.abs(p.x-cam.x)>hw+CAR||Math.abs(p.y-cam.y)>hh+CAR)continue;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);
+    ctx.fillStyle='rgba(0,0,0,.32)';ctx.fillRect(-CAR*.47+6,-17+8,CAR*.94,34);
+    if(c.dead){ctx.fillStyle='#24211d';ctx.fillRect(-CAR*.47,-17,CAR*.94,34);ctx.fillStyle='rgba(255,120,40,.35)';ctx.fillRect(-CAR*.2,-8,CAR*.3,16);}
+    else if(c.k==='loco'){ctx.fillStyle='#262a22';ctx.fillRect(-CAR*.47,-17,CAR*.94,34);ctx.fillStyle='#3a3f33';ctx.beginPath();ctx.roundRect(-CAR*.2,-12,CAR*.6,24,10);ctx.fill();ctx.fillStyle='#4a2a22';ctx.fillRect(-CAR*.47,-15,CAR*.24,30);ctx.fillStyle='#111';ctx.beginPath();ctx.arc(CAR*.28,0,6,0,TAU);ctx.fill();}
+    else if(c.k==='tank'){ctx.fillStyle='#2e2c28';ctx.fillRect(-CAR*.47,-17,CAR*.94,34);ctx.fillStyle='#6a6a62';ctx.beginPath();ctx.roundRect(-CAR*.44,-14,CAR*.88,28,13);ctx.fill();ctx.fillStyle='#ebd257';ctx.font='700 8px "IBM Plex Mono",monospace';ctx.textAlign='center';ctx.fillText('FUEL',0,3);}
+    else{ctx.fillStyle='#5a3a26';ctx.fillRect(-CAR*.47,-17,CAR*.94,34);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=1;ctx.beginPath();for(let x=-CAR*.4;x<CAR*.47;x+=8){ctx.moveTo(x,-17);ctx.lineTo(x,17);}ctx.stroke();ctx.fillStyle='#6e4a32';ctx.fillRect(-CAR*.47,-3,CAR*.94,6);}
+    ctx.restore();}}
 /* ================= terrain: rivers, bridges, mud, hills =================
    Rivers block tanks (and the pathfinder) but never shells or line of sight. Each road that crosses a river gets a bridge;
    enough explosive (heavy shells, bombs) drops it, and the gap becomes water. Mud slows tanks, hills give +15 % penetration
@@ -1249,13 +1299,14 @@ function hiddenIn(t){if(!t||t.air||(t.firedAt&&time-t.firedAt<4))return false;le
 function segX(a,b,c,d){const r=[b[0]-a[0],b[1]-a[1]],q=[d[0]-c[0],d[1]-c[1]],den=r[0]*q[1]-r[1]*q[0];if(Math.abs(den)<1e-6)return null;
   const t=((c[0]-a[0])*q[1]-(c[1]-a[1])*q[0])/den,u=((c[0]-a[0])*r[1]-(c[1]-a[1])*r[0])/den;return t>=0&&t<=1&&u>=0&&u<=1?[a[0]+r[0]*t,a[1]+r[1]*t]:null;}
 function genTerrain(seed){const r=mulberry32((seed^0x2f6b1)>>>0),A=WW*WH/6e6;rivers=[];bridges=[];water=[];mud=[];hills=[];if(!gFeat)prepGround();
+  rail={base:WH*(.34+r()*.05),ph:r()*6};const railPts=[];for(let x=-200;x<=WW+200;x+=150)railPts.push([x,railY(x)]);rail.pts=railPts;train=null;trainNext=rand(30,60);
   const nearField=(x,y,pad)=>fields.some(f=>x>f.x-pad&&x<f.x+f.w+pad&&y>f.y-pad-200&&y<f.y+f.h+pad);
   for(let k=0;k<(A>8?2:1);k++){const vert=k===0,pts=[],w=78+r()*28,step=220;let u=vert?WW*(.2+r()*.08):WH*(.86+r()*.04);
     const lo=vert?WW*.14:WH*.8,hi=vert?WW*.33:WH*.95,len=vert?WH:WW;
     for(let v=-60;v<=len+60;v+=step){pts.push(vert?[u,v]:[v,u]);u=clamp(u+(r()-.5)*190,lo,hi);}
     const rv={pts,w};rivers.push(rv);
     /* bridges where roads cross; otherwise two plain bridges along the river */
-    const xs=[];for(const road of gFeat.roads)for(let i=1;i<road.length;i++)for(let j=1;j<pts.length;j++){const q=segX(road[i-1],road[i],pts[j-1],pts[j]);if(q&&!xs.some(o=>Math.hypot(o[0]-q[0],o[1]-q[1])<600))xs.push([q[0],q[1],j]);}
+    const xs=[];for(const road of gFeat.roads.concat([rail.pts]))for(let i=1;i<road.length;i++)for(let j=1;j<pts.length;j++){const q=segX(road[i-1],road[i],pts[j-1],pts[j]);if(q&&!xs.some(o=>Math.hypot(o[0]-q[0],o[1]-q[1])<600))xs.push([q[0],q[1],j]);}
     if(xs.length<2)for(const f of[.3,.7]){const j=Math.max(1,Math.round(f*(pts.length-1))),q=[(pts[j-1][0]+pts[j][0])/2,(pts[j-1][1]+pts[j][1])/2];if(!xs.some(o=>Math.hypot(o[0]-q[0],o[1]-q[1])<600))xs.push([q[0],q[1],j]);}
     for(const q of xs.slice(0,4)){const j=q[2],a=Math.atan2(pts[j][1]-pts[j-1][1],pts[j][0]-pts[j-1][0]);bridges.push({i:bridges.length,x:q[0],y:q[1],a,span:w+70,wd:58,hp:40,up:true,gap:[]});}
     /* the water itself: overlapping squares along the bank line, minus a gap at each bridge */
@@ -1325,6 +1376,9 @@ function paintRegion(g,x0,y0,w,h,sc,detail){
   g.lineCap='round';g.lineJoin='round';
   for(const pts of F.roads){g.beginPath();g.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)g.lineTo(pts[i][0],pts[i][1]);
     g.strokeStyle='#5f5539';g.lineWidth=50;g.stroke();g.strokeStyle='#766a4b';g.lineWidth=38;g.stroke();if(detail){g.setLineDash([3,13]);g.strokeStyle='rgba(45,36,22,.45)';g.lineWidth=26;g.stroke();g.setLineDash([]);}}
+  if(rail&&rail.pts){const P=rail.pts;g.beginPath();g.moveTo(P[0][0],P[0][1]);for(let i=1;i<P.length;i++)g.lineTo(P[i][0],P[i][1]);g.strokeStyle='#4f4a40';g.lineWidth=30;g.stroke();
+    if(detail){g.setLineDash([3,9]);g.strokeStyle='#3a2a1c';g.lineWidth=26;g.stroke();g.setLineDash([]);}
+    for(const off of[-6,6]){g.beginPath();for(let i=0;i<P.length;i++){const a=Math.atan2((P[Math.min(i+1,P.length-1)][1]-P[Math.max(i-1,0)][1]),(P[Math.min(i+1,P.length-1)][0]-P[Math.max(i-1,0)][0]));const x=P[i][0]-Math.sin(a)*off,y=P[i][1]+Math.cos(a)*off;if(i)g.lineTo(x,y);else g.moveTo(x,y);}g.strokeStyle='#8a8a84';g.lineWidth=detail?2:1/sc;g.stroke();}}
   for(const rv of rivers){g.beginPath();g.moveTo(rv.pts[0][0],rv.pts[0][1]);for(let i=1;i<rv.pts.length;i++)g.lineTo(rv.pts[i][0],rv.pts[i][1]);
     g.strokeStyle='#5a5236';g.lineWidth=rv.w+30;g.stroke();g.strokeStyle='#2c4448';g.lineWidth=rv.w;g.stroke();g.strokeStyle='rgba(110,150,150,.28)';g.lineWidth=rv.w*.45;g.stroke();
     if(detail){g.setLineDash([18,26]);g.strokeStyle='rgba(200,220,215,.12)';g.lineWidth=3;g.stroke();g.setLineDash([]);}}
@@ -1611,7 +1665,7 @@ function kill(t,by,cause){
   const big=cause==='ammo'||cause==='french'||cause==='nuke';
   if(big&&t.T.tu&&!air&&cause!=='nuke')t.turretFly={x:0,y:0,vx:rand(-90,90),vy:rand(-90,90),spin:rand(-8,8),rot:0,t:0};
   if(!air)fx({k:'kill',x:r1(t.x),y:r1(t.y),b:big?1:0,w:t.T.W,n:t.nid});else fx({k:'boom',x:r1(t.x),y:r1(t.y),f:900});
-  const why=typeof cause==='string'&&cause.startsWith('air:')?cause.slice(4):air&&cause==='crew'?'shot down':{ammo:'ammo rack detonated',crew:'crew knocked out',fire:'burned out',french:'spontaneously exploded',bridge:'went down with the bridge',nuke:'nuked',crushed:'crushed'}[cause]||'destroyed';
+  const why=typeof cause==='string'&&cause.startsWith('air:')?cause.slice(4):air&&cause==='crew'?'shot down':{ammo:'ammo rack detonated',crew:'crew knocked out',fire:'burned out',french:'spontaneously exploded',bridge:'went down with the bridge',train:'was hit by a train',nuke:'nuked',crushed:'crushed'}[cause]||'destroyed';
   if(t.team==='e'){
     if(isHuman(by)&&cause!=='nuke'&&cause!=='french'){const pt=Math.min(5,by.T.tier),et=t.T.tier,rp=Math.round(25*et*(1+.25*clamp(et-pt,-1,2))*rpMul());
       if(by.stats)by.stats.kills++;if(by===player)kills++;rpFor(by,rp);
@@ -1624,7 +1678,7 @@ function kill(t,by,cause){
     t.deathCause=why;if(t===player)deathCause=why;}
 }
 function explosion(x,y,f,owner,opts={}){
-  if(bridges.length)bridgeBlast(x,y,f,owner);const rs=opts.rs||1,Rx=2.2*Math.cbrt(f)*rs,opPen=1.6*Math.cbrt(f),R2=Rx*1.3;
+  if(bridges.length)bridgeBlast(x,y,f,owner);if(train||trucks.length)vehicleBlast(x,y,f,owner);const rs=opts.rs||1,Rx=2.2*Math.cbrt(f)*rs,opPen=1.6*Math.cbrt(f),R2=Rx*1.3;
   fx(rs!==1?{k:'boom',x:r1(x),y:r1(y),f:Math.round(f),rs:r2(rs)}:{k:'boom',x:r1(x),y:r1(y),f:Math.round(f)});
   const hitList=[];
   for(const t of tanks){if(!t.alive||t.air)continue;const T=t.T,l=local(t,x,y),dx=Math.max(0,Math.abs(l[0])-T.L/2),dy=Math.max(0,Math.abs(l[1])-T.W/2),d=t===opts.direct?0:Math.hypot(dx,dy);if(d>=Rx)continue;
@@ -1869,7 +1923,7 @@ function waveCleared(){
   for(const h of humans())rpFor(h,rp);
   if(wave>save.best){save.best=wave;persist();}
   for(const h of humans())if(h.alive)resupply(h);else respawn(h);
-  phase='break';phaseT=0;votes.clear();
+  phase='break';phaseT=0;votes.clear();if(train&&train.stopped)train=null;
   if(tanks.some(t=>t.team==='e'&&t.air&&t.alive)){tanks=tanks.filter(t=>!(t.team==='e'&&t.air&&t.alive));sayAll('The remaining enemy aircraft turn for home','#8e8a6b');}
   if(tanks.some(t=>t.ally)){tanks=tanks.filter(t=>!t.ally);navDirty=true;sayAll('AI support heads back to base','#8e8a6b');}
   clearWrecks(false);
@@ -2154,7 +2208,7 @@ function start(fromWave){
   statsHost=newStats();allDeadT=-1;menuOpen=false;net.events=[];net.input=null;net.lastClicks=undefined;net.lastPicks=undefined;
   const squad=net.mode==='host'?peerList().filter(pe=>tget(pe.tank)&&(!tget(pe.tank).admin||peAll(pe))):[];for(const pe of net.peers.values()){pe.t=null;pe.stats=null;}votes.clear();
   setMapSize(...mapDims(1+squad.length));
-  const seed=(Math.random()*1e9)|0;curSeed=seed;genMap(seed);
+  const seed=(Math.random()*1e9)|0;curSeed=seed;genMap(seed);trucksReset();
   const F0=fields[0];player=T.air?makeTank(T,F0.x+F0.w*.2,F0.y+F0.h/2,'p'):makeTank(T,WW/2,WH/2,'p');player.a=T.air?0:-Math.PI/2;player.aimAt=player.a;if(T.air)player.want=0;player.stats=statsHost;tanks.push(player);
   squad.forEach((pe,i)=>{const a=-Math.PI/2+(i+1)*TAU/(squad.length+1),r=110+Math.floor(i/6)*90,sp=freeSpotNear(WW/2+Math.cos(a)*r,WH/2+Math.sin(a)*r);spawnPeerTank(pe,sp.x,sp.y,-Math.PI/2);pe.stats=newStats();pe.t.stats=pe.stats;});
   computeReach(player.x,player.y);rebuildDynNav();
@@ -2498,6 +2552,7 @@ function update(dt){
       if(shotVsPlanes(s,px0,py0,s.x,s.y)){dead=true;break;}
       if(s.dist>s.maxD){dead=true;if(s.T.aa&&s.T.fz)fx({k:'flak',x:r1(s.x),y:r1(s.y),c:s.T.c});else if(am.he)explosion(s.x,s.y,s.T.f,s.owner);break;}
       if(s.air)continue;
+      const vh=(train||trucks.length)&&vehicleAt(s.x,s.y);if(vh){dead=true;if(am.he||am.hesh||am.shaped)explosion(s.x,s.y,am.he?s.T.f:Math.max(200,s.T.f*.3),s.owner);else vehicleHit(vh,s.T.c*4,s.owner);fx({k:'cover',x:r1(s.x),y:r1(s.y)});break;}
       const o=inObs(s.x,s.y);
       if(o){dead=true;if(am.he||am.hesh||am.shaped)explosion(s.x,s.y,am.he?s.T.f:Math.max(200,s.T.f*.3),s.owner);
         else{if(o.kind==='fuel')destroyObstacle(o,false,s.owner);else if(o.kind!=='rock'&&s.T.c>=100){o.hp-=s.T.c*1.5;if(o.hp<=0)destroyObstacle(o,false,s.owner);}fx({k:'cover',x:r1(s.x),y:r1(s.y)});}
@@ -2514,7 +2569,7 @@ function update(dt){
   for(let i=strikes.length-1;i>=0;i--){const q=strikes[i];q.t-=dt;if(q.target&&q.target.alive){q.x=q.target.x;q.y=q.target.y;}if(q.t<=-1.5)strikes.splice(i,1);}
   strikeSmoke(dt);
   for(let i=fuelQ.length-1;i>=0;i--){const q=fuelQ[i];if(time<q.at)continue;fuelQ.splice(i,1);explosion(q.x,q.y,q.f||26000,q.by||null);for(let k=0;k<(q.f<20000?2:6);k++)fx({k:'boom',x:r1(q.x+rand(-30,30)),y:r1(q.y+rand(-30,30)),f:2500});}
-  mineCheck();updDepots(dt);
+  mineCheck();trainUpd(dt);trucksUpd(dt);updDepots(dt);
   updNukes(dt);
   {const wr=tanks.filter(k=>!k.alive&&!isHuman(k)&&!k.air);if(wr.length>14){const old=new Set(wr.slice(0,wr.length-14));tanks=tanks.filter(k=>!old.has(k));navDirty=true;}}
   navT-=dt;if(navDirty&&navT<=0){rebuildDynNav();navT=1;}
@@ -2695,7 +2750,7 @@ function draw(dt){
   const ox=VW/2+sx-cam.x*ZOOM,oy=VH/2+sy-cam.y*ZOOM;
   const vx0=cam.x-hw-60,vx1=cam.x+hw+60,vy0=cam.y-hh-60,vy1=cam.y+hh+60,vis=(x,y,r)=>x+r>vx0&&x-r<vx1&&y+r>vy0&&y-r<vy1;
   ctx.setTransform(DPR*ZOOM,0,0,DPR*ZOOM,DPR*ox,DPR*oy);
-  drawGround(hw,hh);drawBridges(hw,hh);drawMines(hw,hh);
+  drawGround(hw,hh);drawBridges(hw,hh);drawMines(hw,hh);drawRailTraffic(hw,hh);
   ctx.strokeStyle='rgba(216,207,162,.25)';ctx.lineWidth=4;ctx.strokeRect(0,0,WW,WH);
   /* blast marks fade away quickly (CRATER_LIFE s, nukes longer) */
   craters=craters.filter(c=>time-(c.t??time)<(c.nuke?CRATER_LIFE*4:CRATER_LIFE));
@@ -3004,7 +3059,7 @@ function hud(){lockHUD();terrainHUD();
    Star layout: the host's browser runs the whole battle for up to 14 players. Every guest sends inputs and
    actions (~30 Hz) and draws snapshots plus a stream of effect events. PeerJS only brokers the first handshake;
    game traffic then flows browser to browser over WebRTC. Everything that arrives is parsed and clamped before use. */
-const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=5;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
+const NET_PREFIX='ironfield-coop-',MAX_PLAYERS=14,PROTO=6;/* bump PROTO whenever co-op messages change: games on a different version can't share a room */
 const PEER_OPTS={debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}};
 /* the PeerJS library comes from one of three CDNs, whichever loads first in turn */
 const PEER_SRC=['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js','https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js'];
@@ -3181,7 +3236,7 @@ function sendSnapshot(){
   const shared=JSON.stringify({e:'snap',w:wave,ph:phase==='break'?1:0,pt:r1(phaseT),l:enemiesLeft(),nc:r1(nukeCD),host:player?player.nid:0,hn,
     tk:tanks.map(packTank),
     sh:shells.map(packShell).filter(Boolean),
-    sw:r2(swarmK),nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
+    rt:train?[r1(train.x),train.dir,train.cars.map(c=>(c.k==='loco'?0:c.k==='tank'?1:2)+(c.dead?3:0))]:0,tf:trucks.map(k=>[r1(k.x),r1(k.y),r2(k.a),(k.fuel?1:0)+(k.dead?2:0)]),sw:r2(swarmK),nk:nukes.map(n=>[r1(n.x),r1(n.y),r2(n.t),Math.round(n.ring||0)]),st:strikes.map(q=>[r1(q.x),r1(q.y),r1(q.t)]),ev:net.events});
   net.events=[];const head=shared.slice(0,-1);
   for(const pe of list){const me=pe.t?packMe(pe.t):null,ev=pe.events;pe.events=[];
     sendTo(pe,head+',"pr":'+Math.round(pe.rp||0)+',"you":'+(pe.t?pe.t.nid:0)+',"vt":'+JSON.stringify([votes.size,n,votes.has(pe.pid)?1:0,need])+',"me":'+JSON.stringify(me)+',"pev":'+JSON.stringify(ev)+'}');}
@@ -3265,7 +3320,9 @@ function guestStart(m){
 function applySnap(m){
   if(Array.isArray(m.vt))gVotes={n:num(m.vt[0],0,99),of:num(m.vt[1],1,99),me:!!m.vt[2],need:num(m.vt[3],1,99)};
   if(net.room&&m.pr!==undefined)net.room.rp=Math.round(num(m.pr,0,1e9));
-  swarmK=num(m.sw,1,1.8)||1;wave=Math.round(num(m.w,0,1e4));phase=m.ph?'break':'combat';phaseT=num(m.pt,0,1e6);gLeft=Math.round(num(m.l,0,999));nukeCD=num(m.nc,0,99);if(m.you)myNid=m.you;hostNid=m.host;
+  swarmK=num(m.sw,1,1.8)||1;
+  if(Array.isArray(m.rt)&&Array.isArray(m.rt[2])){const cars=m.rt[2].slice(0,8).map(v=>{v=Math.round(num(v,0,5));return{k:['loco','tank','box'][v%3],dead:v>=3,hp:1};});train={x:num(m.rt[0],-2e4,4e4),dir:m.rt[1]<0?-1:1,cars,sp:0,stopped:true};}else train=null;
+  if(Array.isArray(m.tf))trucks=m.tf.slice(0,20).filter(Array.isArray).map(a=>({x:num(a[0],-500,WW+500),y:num(a[1],-500,WH+500),a:num(a[2],-7,7),fuel:!!(a[3]&1),dead:!!(a[3]&2)}));wave=Math.round(num(m.w,0,1e4));phase=m.ph?'break':'combat';phaseT=num(m.pt,0,1e6);gLeft=Math.round(num(m.l,0,999));nukeCD=num(m.nc,0,99);if(m.you)myNid=m.you;hostNid=m.host;
   if(Array.isArray(m.hn)){const nm={};for(const r of m.hn.slice(0,MAX_PLAYERS))if(Array.isArray(r))nm[num(r[0],0,1e9)]=cleanName(r[1])||'Teammate';net.names=nm;}
   const seen=new Set();
   if(!Array.isArray(m.tk)||!Array.isArray(m.sh)||!Array.isArray(m.ev)||!Array.isArray(m.nk)||!Array.isArray(m.st))return;
