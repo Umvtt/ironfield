@@ -2554,7 +2554,8 @@ function adoptCloud(sv,rev){if(!sv||!Array.isArray(sv.slots))return;cloud.quiet=
     store.slots=[0,1,2].map(i=>sv.slots[i]?normSave(sv.slots[i]):null);store.active=clamp(Math.round(+sv.active||0),0,SLOTS-1);if(!store.slots[store.active])store.slots[store.active]=freshSave();
     store.acct.rev=rev;store.acct.dirty=0;useProfile();save=net.mode==='guest'?save:(net.temp||store.slots[store.active]);persist();}finally{cloud.quiet=false;}
   if(state==='hangar')renderHangar();}
-function cloudDirty(){clearTimeout(cloud.timer);cloud.timer=setTimeout(cloudPush,8000);}
+function cloudDirty(){if(!cloud.timer)cloud.timer=setTimeout(()=>{cloud.timer=0;cloudPush();},60000);}
+function cloudNow(){if(store.acct&&store.acct.dirty){clearTimeout(cloud.timer);cloud.timer=0;cloudPush();}}
 async function cloudPush(){const a=store.acct;if(!a||cloud.busy)return;if(!a.dirty)return;cloud.busy=true;
   try{const r=await acctCall('save',{tk:a.tk,rev:a.rev,save:cloudSlots()});if(store.acct!==a)return;
     if(r&&r.ok){a.rev=r.rev;a.dirty=0;if(r.fixed&&r.save){adoptCloud(r.save,r.rev);toast('The server corrected your RP: it grew faster than anyone can earn');}else{cloud.quiet=true;persist();cloud.quiet=false;}}
@@ -2585,13 +2586,13 @@ function renderAcct(){const btn=$('#acctBtn'),box=$('#acctBox');if(!btn||!box)re
   const go=el('button',{type:'button',className:'btn small',textContent:'Sign in'}),mk=el('button',{type:'button',className:'btn ghost small',textContent:'Create account'});go.onclick=()=>acctGo(false);mk.onclick=()=>acctGo(true);
   box.append(go,mk,el('span',{className:'why',id:'acMsg'}));$('#acPw').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();acctGo(false);}});}
 $('#acctBtn').addEventListener('click',()=>{const b=$('#acctBox');b.hidden=!b.hidden;renderAcct();});
-addEventListener('pagehide',()=>{if(store.acct&&store.acct.dirty){clearTimeout(cloud.timer);cloudPush();}});
+addEventListener('pagehide',cloudNow);document.addEventListener('visibilitychange',()=>{if(document.hidden)cloudNow();});
 /* ================= open rooms =================
    Hosts who leave "show my room" on check in with the server every 20 s; the multiplayer tab lists them. */
 let roomsT=0,roomBeat=0;
 async function roomsPoll(){clearTimeout(roomsT);if(hangarMode!=='mp'||net.mode!=='off'||state!=='hangar'||document.hidden){roomsT=setTimeout(roomsPoll,4000);return;}
   const L=await codeAPIs();let r=null;for(let i=0;i<L.length&&!r;i++){const k=(apiIdx+i)%L.length;try{const x=await fetch(L[k]+'/rooms',{cache:'no-store'});r=x.ok?await x.json():null;}catch(e){}}
-  renderRooms(r&&Array.isArray(r.rooms)?r.rooms:null);roomsT=setTimeout(roomsPoll,8000);}
+  renderRooms(r&&Array.isArray(r.rooms)?r.rooms:null);roomsT=setTimeout(roomsPoll,20000);}
 function renderRooms(list){const box=$('#roomList');if(!box)return;box.textContent='';const el=(tag,props)=>Object.assign(document.createElement(tag),props||{});
   if(!list){box.append(el('p',{className:'why',textContent:'Can\'t reach the room list. Joining by code still works.'}));return;}
   const ok=list.filter(r=>r&&r.v===PROTO&&/^[A-Z0-9]{6}$/.test(r.code));if(!ok.length){box.append(el('p',{className:'why',textContent:'No open rooms right now. Create one!'}));return;}
@@ -2601,7 +2602,7 @@ async function roomUp(down){if(net.mode!=='host'||!net.code)return;if(!net.roomK
   if(down||!store.pub){if(net.listed){net.listed=false;codeCall('/room',{op:'down',code:net.code,k:net.roomK});}return;}
   const mine=store.badge&&BADGE.get(store.badge);net.listed=true;codeCall('/room',{op:'up',code:net.code,k:net.roomK,name:store.name,n:humansCount(),max:MAX_PLAYERS,lock:net.locked?1:0,wave,st:state==='hangar'?0:1,v:PROTO,dev:store.dev,bg:mine&&mine.l||''});}
 const humansCount=()=>1+peerList().length;
-setInterval(()=>{if(net.mode==='host')roomUp();},20000);
+setInterval(()=>{if(net.mode==='host')roomUp();},30000);
 {const pb=$('#pubRoom');pb.checked=!!store.pub;pb.addEventListener('change',()=>{store.pub=pb.checked?1:0;persist();roomUp();});}
 /* ================= live player link =================
    The game tells the server who is playing (for the owner's panel) and reports cleared waves for the daily stats;
@@ -3413,8 +3414,8 @@ function showUpdateBar(b){if(document.getElementById('updBar'))return;const bar=
 async function apiHome(){const L=await codeAPIs();if(!apiIdx||!L.length)return;try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),5000),r=await fetch(L[0]+'/config',{cache:'no-store',signal:ac.signal});clearTimeout(to);
   if(r.ok){apiWorked(0);try{liveWs&&liveWs.close();}catch(e){}}}catch(e){}}
 let livePoll=Date.now();apiHome().finally(()=>liveCfg()).then(()=>{liveConnect();if(store.acct){acctName();acctLoad();}});renderAcct();roomsPoll();
-setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up||Date.now()-livePoll>45000){livePoll=Date.now();liveCfg();if(!up&&!liveWs)liveConnect();}},20000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-livePoll>5000){livePoll=Date.now();liveCfg();}});checkBadges([store.badge]);
+setInterval(()=>{if(document.hidden)return;const up=liveWs&&liveWs.readyState===1;if(!up){livePoll=Date.now();liveCfg();if(!liveWs)liveConnect();}},20000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!(liveWs&&liveWs.readyState===1)&&Date.now()-livePoll>5000){livePoll=Date.now();liveCfg();}});checkBadges([store.badge]);
 if(MY_BUILD&&MP_OK)setInterval(async()=>{if(state!=='hangar')return;const b=await latestBuild();if(b&&b!==MY_BUILD)showUpdateBar(b);},300000);
 async function hostCoop(){
   if(store.ban){coopStatus('This device is banned from multiplayer'+(store.ban!=='banned'?': '+store.ban:''),true);return;}
